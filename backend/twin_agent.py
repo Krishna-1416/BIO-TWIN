@@ -50,9 +50,10 @@ class GeminiAgent:
         """
         
         # Initialize Gemini model with tools and system instruction
-        # Primary: gemini-3-flash, Fallback: gemini-2.5-flash
+        # Primary: gemini-3-flash, Fallback: gemini-2.5-flash, Final Backup: gemini-1.5-flash
         self.primary_model_name = 'models/gemini-3-flash-preview'
         self.fallback_model_name = 'models/gemini-2.5-flash'
+        self.backup_model_name = 'models/gemini-1.5-flash'
         self.system_instruction = system_instruction
         self.tools_list = tools_list
         
@@ -104,7 +105,7 @@ class GeminiAgent:
         """
         Direct chat with the user, optionally context-aware.
         Enforces health-only topic restriction.
-        Automatically falls back to secondary model on quota errors.
+        Automatically falls back through multiple models on quota errors.
         """
         # Style instruction with health-only enforcement
         style_instruction = """
@@ -128,17 +129,38 @@ IMPORTANT:
                 print(f"[FALLBACK] Primary model quota exhausted. Switching to {self.fallback_model_name}...")
                 
                 # Switch to fallback model
-                self.model = genai.GenerativeModel(
-                    model_name=self.fallback_model_name,
-                    tools=self.tools_list,
-                    system_instruction=self.system_instruction
-                )
-                self.current_model = self.fallback_model_name
-                self.chat = self.model.start_chat(enable_automatic_function_calling=True)
-                
-                # Retry with fallback
-                response = self.chat.send_message(final_message)
-                return response.text
+                try:
+                    self.model = genai.GenerativeModel(
+                        model_name=self.fallback_model_name,
+                        tools=self.tools_list,
+                        system_instruction=self.system_instruction
+                    )
+                    self.current_model = self.fallback_model_name
+                    self.chat = self.model.start_chat(enable_automatic_function_calling=True)
+                    
+                    # Retry with fallback
+                    response = self.chat.send_message(final_message)
+                    return response.text
+                except Exception as e2:
+                    # Check if fallback also hit rate limit
+                    if "429" in str(e2) or "quota" in str(e2).lower() or "ResourceExhausted" in str(e2):
+                        print(f"[FINAL BACKUP] Fallback model also exhausted. Switching to {self.backup_model_name}...")
+                        
+                        # Switch to backup model (gemini-1.5-flash)
+                        self.model = genai.GenerativeModel(
+                            model_name=self.backup_model_name,
+                            tools=self.tools_list,
+                            system_instruction=self.system_instruction
+                        )
+                        self.current_model = self.backup_model_name
+                        self.chat = self.model.start_chat(enable_automatic_function_calling=True)
+                        
+                        # Retry with backup
+                        response = self.chat.send_message(final_message)
+                        return response.text
+                    else:
+                        # Re-raise non-quota errors from fallback
+                        raise e2
             else:
                 # Re-raise non-quota errors
                 raise e
