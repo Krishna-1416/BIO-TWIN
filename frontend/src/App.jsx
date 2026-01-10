@@ -37,19 +37,19 @@ function App() {
   const [isCalendarConnected, setIsCalendarConnected] = useState(false);
 
   // Fetch initial health data if available
-  useEffect(() => {
-    if (view === 'app') {
-      fetch("http://localhost:8000/health-data")
-        .then(res => res.json())
-        .then(data => {
-          if (data) {
-            setHealthData(data);
-            // setActiveTab('dashboard');
-          }
-        })
-        .catch(err => console.error("Error fetching health data:", err));
-    }
-  }, [view]);
+  // useEffect(() => {
+  //   if (view === 'app') {
+  //     fetch("http://localhost:8000/health-data")
+  //       .then(res => res.json())
+  //       .then(data => {
+  //         if (data) {
+  //           setHealthData(data);
+  //           // setActiveTab('dashboard');
+  //         }
+  //       })
+  //       .catch(err => console.error("Error fetching health data:", err));
+  //   }
+  // }, [view]);
 
   // Check Calendar Status
   useEffect(() => {
