@@ -44,7 +44,7 @@ function App() {
         .then(data => {
           if (data) {
             setHealthData(data);
-            setActiveTab('dashboard');
+            // setActiveTab('dashboard');
           }
         })
         .catch(err => console.error("Error fetching health data:", err));
