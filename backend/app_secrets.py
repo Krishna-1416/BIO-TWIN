@@ -4,5 +4,4 @@
 # Get your Gemini API key from: https://makersuite.google.com/app/apikey
 
 #
-#GEMINI_API_KEY = "AIzaSyCSOfq6cMV8qsjj4-duexcjVgle0vAEzV8"
-GEMINI_API_KEY = "AIzaSyD_-Ua9Mh_Ux3f7W5yxFRc7ozlFXgr3VsA"
+GEMINI_API_KEY = "Pls enter ur own api keys."
