@@ -6,6 +6,7 @@ import os
 import scanner
 import twin_agent
 import memory
+import firebase_config
 
 app = FastAPI(title="Bio-Twin Backend")
 
@@ -54,6 +55,19 @@ def scan_endpoint(file: UploadFile = File(...)):
             "riskFactor": result.get("primary_risk") or "None",
             "correlations": result.get("correlations") or []
         }
+        
+        # Also save to Firestore if available
+        if firebase_config.db:
+            try:
+                from datetime import datetime
+                health_doc = {
+                    **latest_health_data,
+                    "timestamp": datetime.now()
+                }
+                firebase_config.db.collection('healthScans').add(health_doc)
+                print("Health data saved to Firestore")
+            except Exception as e:
+                print(f"Error saving to Firestore: {e}")
     
     return result
 

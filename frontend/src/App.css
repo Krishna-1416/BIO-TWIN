@@ -118,8 +118,11 @@ body {
   border-radius: 24px;
   /* Rounded corners */
   margin: 1rem;
+  margin-top: 5rem;
+  /* Push sidebar down to make room for logo */
   /* Floating effect */
-  height: calc(100vh - 2rem);
+  height: calc(100vh - 6rem);
+  /* Adjust height */
   /* Float in middle */
   padding: 1.5rem 1rem;
   display: flex;
@@ -142,19 +145,35 @@ body {
 
 .sidebar-header {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 2.5rem;
-  padding-left: 0.5rem;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0;
+  margin-bottom: 1rem;
+  padding: 0 0 0 1rem;
+  /* Align matches nav items in expanded mode */
   width: 100%;
 }
 
 .dashboard-container.sidebar-collapsed .sidebar-header {
-  justify-content: center;
-  padding-left: 0;
-  flex-direction: column;
+  /* Restore the specific alignment for collapsed mode */
+  padding: 0 0 0 2.2rem;
   gap: 1rem;
 }
+
+.app-brand-header {
+  position: fixed;
+  top: 1.5rem;
+  left: 1.5rem;
+  /* Align left with sidebar edge */
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  /* Removed transition to keep it fixed */
+}
+
+/* Removed relative movement for collapsed state */
 
 .brand {
   /* margin-bottom removed as it's now in header */
@@ -329,17 +348,19 @@ body {
 .user-dropdown {
   position: absolute;
   bottom: 100%;
-  left: 0;
   right: 0;
   margin-bottom: 0.5rem;
-  background: rgba(30, 30, 32, 0.95);
-  -webkit-backdrop-filter: blur(20px);
+  background: var(--bg-card);
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--border-radius-md);
-  overflow: hidden;
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 0.5rem;
+  min-width: 220px;
+  box-shadow: var(--shadow-lg);
+  z-index: 1000;
   animation: slideUpFade 0.2s ease-out;
+  transform-origin: bottom right;
 }
 
 @keyframes slideUpFade {
@@ -355,27 +376,31 @@ body {
 }
 
 .user-dropdown .dropdown-item {
+  width: 100%;
+  padding: 0.8rem 1rem;
   display: flex;
   align-items: center;
   gap: 0.8rem;
-  padding: 0.8rem 1rem;
-  color: var(--text-primary);
-  text-decoration: none;
-  transition: background 0.2s;
-  font-size: 0.9rem;
-  background: transparent;
   border: none;
-  width: 100%;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-weight: 500;
   cursor: pointer;
+  transition: all 0.2s ease;
+  border-radius: 12px;
+  text-decoration: none;
   text-align: left;
 }
 
 .user-dropdown .dropdown-item:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--bg-surface-subtle);
+  transform: translateX(4px);
 }
 
 .user-dropdown .dropdown-item.connected {
-  color: var(--accent-blue);
+  color: #34c759;
+  background: rgba(52, 199, 89, 0.1);
   cursor: default;
 }
 
@@ -420,7 +445,8 @@ body {
 
 /* --- Main Content --- */
 .main-content {
-  padding: 2rem 3rem;
+  padding: 6rem 3rem 2rem 3rem;
+  /* Increase top padding to clear fixed header */
   overflow-y: auto;
   /* Subtle gradient background for depth */
   background: transparent;

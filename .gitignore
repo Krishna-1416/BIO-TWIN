@@ -13,6 +13,7 @@ env/
 app_secrets.py
 client_secret.json
 token.json
+serviceAccountKey.json
 
 # Uploads
 uploads/

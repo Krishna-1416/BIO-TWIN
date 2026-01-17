@@ -5,7 +5,15 @@ import { OrbitControls, Environment, ContactShadows } from '@react-three/drei'
 import VoiceOrb from './components/VoiceOrb'
 import LandingPage from './components/LandingPage'
 import ScanPage from './components/ScanPage'
+import AuthPage from './components/AuthPage'
+import NameCollectionModal from './components/NameCollectionModal'
+import SettingsPage from './components/SettingsPage'
+import HistoryPage from './components/HistoryPage'
 import ReactMarkdown from 'react-markdown'
+import { db, auth } from './firebase'
+import { supabase } from './supabase'
+import { collection, addDoc, query, orderBy, limit, getDocs } from 'firebase/firestore'
+import { onAuthStateChanged, signOut } from 'firebase/auth'
 import './App.css'
 
 function App() {
@@ -21,7 +29,7 @@ function App() {
   };
 
   // State
-  const [view, setView] = useState('landing'); // 'landing' or 'app'
+  const [view, setView] = useState('landing'); // 'landing', 'auth', 'app', or 'settings'
   const [activeTab, setActiveTab] = useState('scan'); // 'scan' or 'dashboard'
   const [healthData, setHealthData] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -32,24 +40,61 @@ function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   // User State
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [userName, setUserName] = useState('Guest User');
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const [isCalendarConnected, setIsCalendarConnected] = useState(false);
+  const [showNameModal, setShowNameModal] = useState(false);
 
-  // Fetch initial health data if available
-  // useEffect(() => {
-  //   if (view === 'app') {
-  //     fetch("http://localhost:8000/health-data")
-  //       .then(res => res.json())
-  //       .then(data => {
-  //         if (data) {
-  //           setHealthData(data);
-  //           // setActiveTab('dashboard');
-  //         }
-  //       })
-  //       .catch(err => console.error("Error fetching health data:", err));
-  //   }
-  // }, [view]);
+  // Auth state listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        // Try to get first name from displayName, otherwise use email username
+        if (currentUser.displayName) {
+          // Extract first name from full name (e.g., "John Doe" -> "John")
+          const firstName = currentUser.displayName.split(' ')[0];
+          setUserName(firstName);
+          setShowNameModal(false); // Has name, don't show modal
+        } else {
+          // No display name - show modal to collect name
+          setUserName(currentUser.email.split('@')[0]);
+          setShowNameModal(true);
+        }
+      } else {
+        setShowNameModal(false);
+      }
+      setAuthLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Fetch initial health data from Firestore
+  useEffect(() => {
+    const loadHealthData = async () => {
+      try {
+        const q = query(
+          collection(db, 'healthScans'),
+          orderBy('timestamp', 'desc'),
+          limit(1)
+        );
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+          const latestScan = querySnapshot.docs[0].data();
+          setHealthData(latestScan);
+        }
+      } catch (error) {
+        console.error("Error loading health data from Firestore:", error);
+      }
+    };
+
+    if (view === 'app') {
+      loadHealthData();
+    }
+  }, [view]);
 
   // Check Calendar Status
   useEffect(() => {
@@ -228,10 +273,17 @@ function App() {
     formData.append("file", file);
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+
+      console.log("Starting scan...");
       const response = await fetch("http://localhost:8000/scan", {
         method: "POST",
         body: formData,
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
+      console.log("Scan response received");
 
       const data = await response.json();
 
@@ -242,7 +294,36 @@ function App() {
           alert("Scan Error: " + data.error);
         }
       } else {
-        setHealthData({
+        // Upload to Supabase Storage
+        let fileUrl = null;
+        if (auth.currentUser) {
+          try {
+            // Create unique filename to prevent overwrites
+            const fileName = `${Date.now()}-${file.name}`;
+            const filePath = `${auth.currentUser.uid}/uploads/${fileName}`;
+
+            console.log("Uploading to Supabase Storage...");
+            const { data: uploadData, error: uploadError } = await supabase.storage
+              .from('health-reports')
+              .upload(filePath, file);
+
+            if (uploadError) {
+              console.error("Storage upload error:", uploadError);
+            } else {
+              // Get public URL
+              const { data: { publicUrl } } = supabase.storage
+                .from('health-reports')
+                .getPublicUrl(filePath);
+
+              fileUrl = publicUrl;
+              console.log("File uploaded to:", fileUrl);
+            }
+          } catch (storageErr) {
+            console.error("Storage upload failed", storageErr);
+          }
+        }
+
+        const healthDataToSave = {
           status: data.overall_status || 'Critical',
           hydration: data.hydration_level || 'Medium',
           lastScan: 'Just Now',
@@ -250,8 +331,24 @@ function App() {
           score: data.health_score || '--',
           velocity: data.velocity || 'Unknown',
           riskFactor: data.primary_risk || 'None',
-          correlations: data.correlations || []
-        });
+          correlations: data.correlations || [],
+          correlations: data.correlations || [],
+          timestamp: new Date(),
+          fileUrl: fileUrl,
+          fileName: file.name,
+          fileType: file.type,
+          userId: auth.currentUser.uid
+        };
+
+        // Save to Firestore
+        try {
+          await addDoc(collection(db, 'healthScans'), healthDataToSave);
+          console.log('Health data saved to Firestore');
+        } catch (firestoreError) {
+          console.error('Error saving to Firestore:', firestoreError);
+        }
+
+        setHealthData(healthDataToSave);
 
         // Redirect to dashboard on success
         setActiveTab('dashboard');
@@ -287,56 +384,102 @@ function App() {
   };
   const triggerUpload = () => fileInputRef.current.click();
 
-  if (view === 'landing') {
-    return <LandingPage onEnterApp={() => setView('app')} theme={theme} toggleTheme={toggleTheme} />;
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setView('landing');
+      setHealthData(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
+  // Name modal handlers
+  const handleNameComplete = (firstName) => {
+    setUserName(firstName);
+    setShowNameModal(false);
+  };
+
+  const handleNameSkip = () => {
+    setShowNameModal(false);
+  };
+
+  // Show loading while checking auth
+  if (authLoading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--bg-primary)' }}>
+        <div style={{ textAlign: 'center' }}>
+          <h2>Loading...</h2>
+        </div>
+      </div>
+    );
   }
+
+  // Landing page
+  if (view === 'landing') {
+    return <LandingPage onEnterApp={() => setView(user ? 'app' : 'auth')} theme={theme} toggleTheme={toggleTheme} />;
+  }
+
+  // Auth page (if not logged in)
+  if (view === 'auth' || (!user && view === 'app')) {
+    return <AuthPage onAuthSuccess={() => setView('app')} theme={theme} toggleTheme={toggleTheme} />;
+  }
+
+
+
 
 
   return (
     <div className={`dashboard-container ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+      {/* Top Left Brand Header */}
+      <div className="brand app-brand-header">
+        <div className="logo-icon">
+          <img src="/logo.png" alt="BioTwin Logo" style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
+        </div>
+        <div className="brand-text">
+          <span className="name">BioTwin</span>
+        </div>
+      </div>
+
       {/* Sidebar Navigation */}
       <aside className="sidebar">
         <div className="sidebar-header">
-          <div className="brand">
-            <div className="logo-icon">
-              <img src="/logo.png" alt="BioTwin Logo" style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
-            </div>
-            {!isSidebarCollapsed && (
-              <div className="brand-text">
-                <span className="name">BioTwin</span>
-              </div>
-            )}
-          </div>
-
           <button
             className="sidebar-toggle"
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
             title={isSidebarCollapsed ? "Maximize Menu" : "Minimize Menu"}
           >
-            <span className="material-icons">
-              {isSidebarCollapsed ? 'chevron_right' : 'chevron_left'}
-            </span>
+            <span className="material-icons">menu</span>
           </button>
         </div>
 
         <nav className="nav-menu">
           <a
             href="#"
-            className={`nav-item ${activeTab === 'scan' ? 'active' : ''}`}
+            className={`nav-item ${view === 'app' && activeTab === 'scan' ? 'active' : ''}`}
             title="Upload Report"
-            onClick={() => setActiveTab('scan')}
+            onClick={() => { setView('app'); setActiveTab('scan'); }}
           >
             <span className="material-icons">cloud_upload</span>
             {!isSidebarCollapsed && <span>Upload Report</span>}
           </a>
           <a
             href="#"
-            className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+            className={`nav-item ${view === 'app' && activeTab === 'dashboard' ? 'active' : ''}`}
             title="Dashboard"
-            onClick={() => setActiveTab('dashboard')}
+            onClick={() => { setView('app'); setActiveTab('dashboard'); }}
           >
             <span className="material-icons">dashboard</span>
             {!isSidebarCollapsed && <span>Dashboard</span>}
+          </a>
+          <a
+            href="#"
+            className={`nav-item ${view === 'history' ? 'active' : ''}`}
+            title="History"
+            onClick={() => setView('history')}
+          >
+            <span className="material-icons">history</span>
+            {!isSidebarCollapsed && <span>History</span>}
           </a>
         </nav>
 
@@ -389,14 +532,14 @@ function App() {
                   </span>
                   <span>{isCalendarConnected ? 'Calendar Connected' : 'Connect Calendar'}</span>
                 </button>
-                <a href="#" className="dropdown-item">
+                <button className="dropdown-item" onClick={() => { setView('settings'); setIsUserDropdownOpen(false); }}>
                   <span className="material-icons">settings</span>
                   <span>Settings</span>
-                </a>
-                <a href="#" className="dropdown-item">
+                </button>
+                <button className="dropdown-item" onClick={handleLogout}>
                   <span className="material-icons">logout</span>
                   <span>Logout</span>
-                </a>
+                </button>
               </div>
             )}
           </div>
@@ -404,177 +547,192 @@ function App() {
       </aside>
 
       {/* Main Content Area */}
-      <main className="main-content">
-        <header className="top-bar">
-          <div className="greeting">
-            <h1>Good Morning, User</h1>
-            <span className="date">{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
-          </div>
+      <main className="main-content" style={{ overflowY: 'auto' }}>
+        {view === 'settings' ? (
+          <SettingsPage />
+        ) : view === 'history' ? (
+          <HistoryPage />
+        ) : (
+          <>
+            <header className="top-bar">
+              <div className="greeting">
+                <h1>Good Morning, {userName}</h1>
+                <span className="date">{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+              </div>
 
 
 
-          {/* Hidden Input for Upload logic */}
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileUpload}
-            style={{ display: 'none' }}
-            accept="image/*,.pdf"
-          />
-        </header>
-
-        <div className="dashboard-grid">
-
-          {activeTab === 'scan' ? (
-            <div style={{ gridColumn: '1 / -1' }}>
-              <ScanPage
-                onScanComplete={processFile}
-                onSkip={handleSkipScan}
-                embedded={true}
+              {/* Hidden Input for Upload logic */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+                style={{ display: 'none' }}
+                accept="image/*,.pdf"
               />
-            </div>
-          ) : (
-            <>
-              {/* Card 1: Digital Twin 3D View */}
-              <div
-                className={`card digital-twin-card ${isDragOver ? 'drag-active' : ''} ${isUploading ? 'scanning' : ''}`}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-              >
-                {/* Scanning Overlay */}
-                {isUploading && <div className="scan-overlay"></div>}
+            </header>
 
-                {/* Drop Overlay */}
-                {isDragOver && (
-                  <div className="drop-overlay">
-                    <div className="drop-content">
-                      <span className="drop-icon">📂</span>
-                      <h3>Release to Scan</h3>
-                    </div>
-                  </div>
-                )}
+            <div className="dashboard-grid">
 
-                <div className="card-header">
-                  <h3>Digital Twin Analysis</h3>
-                  <span className="status-indicator">{healthData ? '● SYSTEM ONLINE' : '○ WAITING FOR DATA'}</span>
-                  {healthData && <span className="timestamp">Last Sync: {healthData.lastScan}</span>}
+              {activeTab === 'scan' ? (
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <ScanPage
+                    onScanComplete={processFile}
+                    onSkip={handleSkipScan}
+                    embedded={true}
+                  />
                 </div>
-
-                <div className="canvas-wrapper">
-                  <Canvas camera={{ position: [0, 0, 6], fov: 45 }}>
-                    <ambientLight intensity={0.5} />
-                    <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} />
-                    <pointLight position={[-10, -10, -10]} intensity={0.5} />
-                    <Suspense fallback={null}>
-                      <Environment preset="city" />
-                      <VoiceOrb
-                        isActive={isVoiceActive}
-                        healthStatus={healthData ? healthData.status : 'Neutral'}
-                      />
-                    </Suspense>
-                    <OrbitControls enableZoom={false} autoRotate autoRotateSpeed={0.5} />
-                  </Canvas>
-                </div>
-
-                <div className="twin-footer">
-                  <span className="status-label">
-                    {healthData ? (
-                      <><i className="material-icons">check_circle</i> {healthData.status.toUpperCase()}</>
-                    ) : (
-                      <><i className="material-icons">info</i> NO DATA AVAILABLE</>
-                    )}
-                  </span>
-                  <p className="summary-text">
-                    {healthData ? healthData.details : 'Please upload a medical report to generate your digital twin analysis.'}
-                  </p>
-                  <div className="card-actions">
-                    {healthData && <button className="btn-secondary">View Full Body Scan</button>}
-                  </div>
-
-                  {/* Mic Toggle Button */}
-                  <button
-                    className={`mic-toggle-btn ${isVoiceActive ? 'active' : ''}`}
-                    onClick={() => setIsVoiceActive(!isVoiceActive)}
-                    title={isVoiceActive ? "Mute Voice Agent" : "Activate Voice Agent"}
-                  >
-                    <span className="material-icons">{isVoiceActive ? 'mic' : 'mic_off'}</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Card 2: Bio-Risk Assessment */}
-              <div className="card risk-card">
-                <div className="card-header">
-                  <h3>Bio-Risk Assessment</h3>
-                  <span className="menu-dots">•••</span>
-                </div>
-
-                <div className="score-circle-wrapper">
+              ) : (
+                <>
+                  {/* Card 1: Digital Twin 3D View */}
                   <div
-                    className="score-circle"
-                    style={{
-                      background: healthData && !isNaN(parseFloat(healthData.score))
-                        ? `conic-gradient(var(--accent-blue) 0% ${healthData.score}%, var(--bg-card-hover) ${healthData.score}% 100%)`
-                        : 'var(--bg-card-hover)'
-                    }}
+                    className={`card digital-twin-card ${isDragOver ? 'drag-active' : ''} ${isUploading ? 'scanning' : ''}`}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
                   >
-                    <span className="score-value">{healthData ? healthData.score : '--'}</span>
-                    <span className="score-label">SCORE</span>
-                  </div>
-                  <div className="score-meta">
-                    <div className="meta-item">
-                      <label>Velocity</label>
-                      <span className="value safe">{healthData ? healthData.velocity : '--'}</span>
-                    </div>
-                    <div className="meta-item">
-                      <label>Comparison</label>
-                      <span className="value">{healthData ? 'Top 10% for age' : '--'}</span>
-                    </div>
-                  </div>
-                </div>
+                    {/* Scanning Overlay */}
+                    {isUploading && <div className="scan-overlay"></div>}
 
-                <div className="risk-factor">
-                  <div className="risk-row">
-                    <span>Primary Risk Factor</span>
-                    <span className="risk-alert">{healthData ? healthData.riskFactor : '--'}</span>
-                  </div>
-                  <div className="progress-bar">
-                    <div className="progress" style={{ width: healthData ? `${healthData.score}%` : '0%', background: 'var(--accent-orange)' }}></div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Card 3: AI Correlations */}
-              <div className="card correlations-card">
-                <h3>AI Correlations</h3>
-
-                <div className="correlation-list">
-                  {healthData && healthData.correlations && healthData.correlations.length > 0 ? (
-                    healthData.correlations.map((item, idx) => (
-                      <div className="correlation-item" key={idx}>
-                        <div className={`icon-box ${item.type === 'positive' ? 'green' : 'blue'}`}>
-                          {item.type === 'positive' ? '☀' : '⚡'}
-                        </div>
-                        <div className="text-content">
-                          <h4>{item.title}</h4>
-                          <p>{item.description}</p>
+                    {/* Drop Overlay */}
+                    {isDragOver && (
+                      <div className="drop-overlay">
+                        <div className="drop-content">
+                          <span className="drop-icon">📂</span>
+                          <h3>Release to Scan</h3>
                         </div>
                       </div>
-                    ))
-                  ) : (
-                    <div className="correlation-item" style={{ justifyContent: 'center', opacity: 0.6 }}>
-                      <div className="text-content" style={{ textAlign: 'center' }}>
-                        <p>{healthData ? 'No correlations found.' : 'No correlations found.'}</p>
+                    )}
+
+                    <div className="card-header">
+                      <h3>Digital Twin Analysis</h3>
+                      <span className="status-indicator">{healthData ? '● SYSTEM ONLINE' : '○ WAITING FOR DATA'}</span>
+                      {healthData && <span className="timestamp">Last Sync: {healthData.lastScan}</span>}
+                    </div>
+
+                    <div className="canvas-wrapper">
+                      <Canvas camera={{ position: [0, 0, 6], fov: 45 }}>
+                        <ambientLight intensity={0.5} />
+                        <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} />
+                        <pointLight position={[-10, -10, -10]} intensity={0.5} />
+                        <Suspense fallback={null}>
+                          <Environment preset="city" />
+                          <VoiceOrb
+                            isActive={isVoiceActive}
+                            healthStatus={healthData ? healthData.status : 'Neutral'}
+                          />
+                        </Suspense>
+                        <OrbitControls enableZoom={false} autoRotate autoRotateSpeed={0.5} />
+                      </Canvas>
+                    </div>
+
+                    <div className="twin-footer">
+                      <span className="status-label">
+                        {healthData ? (
+                          <><i className="material-icons">check_circle</i> {healthData.status.toUpperCase()}</>
+                        ) : (
+                          <><i className="material-icons">info</i> NO DATA AVAILABLE</>
+                        )}
+                      </span>
+                      <p className="summary-text">
+                        {healthData ? healthData.details : 'Please upload a medical report to generate your digital twin analysis.'}
+                      </p>
+                      <div className="card-actions">
+                        {healthData && healthData.fileUrl && (
+                          <button
+                            className="btn-secondary"
+                            onClick={() => window.open(healthData.fileUrl, '_blank')}
+                          >
+                            View Original Report
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Mic Toggle Button */}
+                      <button
+                        className={`mic-toggle-btn ${isVoiceActive ? 'active' : ''}`}
+                        onClick={() => setIsVoiceActive(!isVoiceActive)}
+                        title={isVoiceActive ? "Mute Voice Agent" : "Activate Voice Agent"}
+                      >
+                        <span className="material-icons">{isVoiceActive ? 'mic' : 'mic_off'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Card 2: Bio-Risk Assessment */}
+                  <div className="card risk-card">
+                    <div className="card-header">
+                      <h3>Bio-Risk Assessment</h3>
+                      <span className="menu-dots">•••</span>
+                    </div>
+
+                    <div className="score-circle-wrapper">
+                      <div
+                        className="score-circle"
+                        style={{
+                          background: healthData && !isNaN(parseFloat(healthData.score))
+                            ? `conic-gradient(var(--accent-blue) 0% ${healthData.score}%, var(--bg-card-hover) ${healthData.score}% 100%)`
+                            : 'var(--bg-card-hover)'
+                        }}
+                      >
+                        <span className="score-value">{healthData ? healthData.score : '--'}</span>
+                        <span className="score-label">SCORE</span>
+                      </div>
+                      <div className="score-meta">
+                        <div className="meta-item">
+                          <label>Velocity</label>
+                          <span className="value safe">{healthData ? healthData.velocity : '--'}</span>
+                        </div>
+                        <div className="meta-item">
+                          <label>Comparison</label>
+                          <span className="value">{healthData ? 'Top 10% for age' : '--'}</span>
+                        </div>
                       </div>
                     </div>
-                  )}
-                </div>
-              </div>
-            </>
-          )}
 
-        </div>
+                    <div className="risk-factor">
+                      <div className="risk-row">
+                        <span>Primary Risk Factor</span>
+                        <span className="risk-alert">{healthData ? healthData.riskFactor : '--'}</span>
+                      </div>
+                      <div className="progress-bar">
+                        <div className="progress" style={{ width: healthData ? `${healthData.score}%` : '0%', background: 'var(--accent-orange)' }}></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 3: AI Correlations */}
+                  <div className="card correlations-card">
+                    <h3>AI Correlations</h3>
+
+                    <div className="correlation-list">
+                      {healthData && healthData.correlations && healthData.correlations.length > 0 ? (
+                        healthData.correlations.map((item, idx) => (
+                          <div className="correlation-item" key={idx}>
+                            <div className={`icon-box ${item.type === 'positive' ? 'green' : 'blue'}`}>
+                              {item.type === 'positive' ? '☀' : '⚡'}
+                            </div>
+                            <div className="text-content">
+                              <h4>{item.title}</h4>
+                              <p>{item.description}</p>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="correlation-item" style={{ justifyContent: 'center', opacity: 0.6 }}>
+                          <div className="text-content" style={{ textAlign: 'center' }}>
+                            <p>{healthData ? 'No correlations found.' : 'No correlations found.'}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+
+            </div>
+          </>
+        )}
       </main>
 
       {/* Chat Bot Interface */}
@@ -632,6 +790,14 @@ function App() {
           </div>
         )}
       </div>
+
+      {/* Name Collection Modal */}
+      {showNameModal && user && (
+        <NameCollectionModal
+          onComplete={handleNameComplete}
+          onSkip={handleNameSkip}
+        />
+      )}
 
     </div>
   )
