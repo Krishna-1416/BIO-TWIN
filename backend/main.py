@@ -3,6 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import shutil
 import os
+import warnings
+
+# Suppress the "google.generativeai" deprecation warning for clean logs
+warnings.filterwarnings("ignore", category=FutureWarning, module="google.generativeai")
+
 import scanner
 import twin_agent
 import memory
@@ -99,10 +104,13 @@ class AgentRequest(BaseModel):
     # Flexible dict input for prototype
     metrics: dict
 
+# Global Agent Instance for Persistence (Single-User Prototype)
+global_agent = twin_agent.GeminiAgent()
+
 @app.post("/agent-act")
 def run_agent(request: AgentRequest):
-    agent = twin_agent.GeminiAgent()
-    response = agent.run(request.metrics)
+    # Reuse global agent to maintain context
+    response = global_agent.run(request.metrics)
     return {"agent_response": response}
 
 class ChatRequest(BaseModel):
@@ -111,18 +119,76 @@ class ChatRequest(BaseModel):
 
 @app.post("/chat")
 def chat_endpoint(request: ChatRequest):
-    agent = twin_agent.GeminiAgent()
-    # Pass context if provided
+    # Reuse global agent to maintain conversation history
+    
+    # Inject current system time and timezone context
+    from datetime import datetime
+    try:
+        from zoneinfo import ZoneInfo
+    except ImportError:
+        # Fallback for Python < 3.9
+        from backports.zoneinfo import ZoneInfo
+
+    # Determine user timezone from context, default to UTC
+    user_tz_str = "UTC"
+    if request.context and "timezone" in request.context:
+        user_tz_str = request.context["timezone"]
+    
+    try:
+        # Get time in user's timezone
+        current_time = datetime.now(ZoneInfo(user_tz_str))
+    except Exception:
+        # Fallback to server time if timezone invalid
+        current_time = datetime.now()
+        
+    current_time_str = current_time.strftime("%A, %B %d, %Y %I:%M %p")
+    
+    # Merge existing context with time info
+    initial_context = request.context or {}
+    # Ensure it's a dict (Pydantic might pass None)
+    if not isinstance(initial_context, dict):
+        initial_context = {}
+        
+    initial_context["system_time"] = current_time_str
+    # Explicitly Note the timezone for the agent
+    initial_context["note"] = f"Current Date & Time is {current_time_str} ({user_tz_str}). Use this for all scheduling."
+
     if request.context:
-        response = agent.reply(request.message, context=request.context)
+        # Update user provided context with time
+        request.context.update(initial_context)
+        response = global_agent.reply(request.message, context=request.context)
     else:
-        response = agent.reply(request.message)
+        # Create new context with just time
+        response = global_agent.reply(request.message, context=initial_context)
     return {"reply": response}
 
 @app.get("/memory/analyze")
 def analyze_history():
     insight = memory.load_history()
     return {"analysis": insight}
+
+class AppointmentRequest(BaseModel):
+    summary: str
+    description: str
+    start_time: str  # ISO format: "2026-01-20T14:00:00"
+    duration_mins: int = 60
+
+@app.post("/calendar/create-appointment")
+def create_appointment(request: AppointmentRequest):
+    service = google_calendar.GoogleCalendarService()
+    result = service.create_event(
+        summary=request.summary,
+        description=request.description,
+        start_time_str=request.start_time,
+        duration_mins=request.duration_mins
+    )
+    return result
+
+@app.post("/calendar/block-time")
+def block_time(reason: str, duration_mins: int = 60):
+    service = google_calendar.GoogleCalendarService()
+    result = service.block_time(reason, duration_mins)
+    return result
 
 if __name__ == "__main__":
     import uvicorn

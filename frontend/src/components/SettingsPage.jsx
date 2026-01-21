@@ -8,6 +8,7 @@ const SettingsPage = () => {
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
     const [email, setEmail] = useState('');
+    const [timezone, setTimezone] = useState('Asia/Kolkata'); // Default to IST per user location
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
@@ -31,6 +32,7 @@ const SettingsPage = () => {
                 const data = userDoc.data();
                 setFirstName(data.firstName || '');
                 setLastName(data.lastName || '');
+                if (data.timezone) setTimezone(data.timezone);
             } else if (user.displayName) {
                 // Fallback to displayName if Firestore doc doesn't exist
                 const nameParts = user.displayName.split(' ');
@@ -78,12 +80,14 @@ const SettingsPage = () => {
                 await updateDoc(userDocRef, {
                     firstName: firstName.trim(),
                     lastName: lastName.trim(),
+                    timezone: timezone,
                     updatedAt: new Date()
                 });
             } else {
                 await setDoc(userDocRef, {
                     firstName: firstName.trim(),
                     lastName: lastName.trim(),
+                    timezone: timezone,
                     email: user.email,
                     createdAt: new Date(),
                     updatedAt: new Date()
@@ -104,6 +108,26 @@ const SettingsPage = () => {
             setError(errorMessage);
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleTimezoneChange = async (newTimezone) => {
+        setTimezone(newTimezone);
+
+        // Save timezone immediately to Firestore (no need to wait for form submit)
+        try {
+            const user = auth.currentUser;
+            if (!user) return;
+
+            const userDocRef = doc(db, 'users', user.uid);
+            await updateDoc(userDocRef, {
+                timezone: newTimezone,
+                updatedAt: new Date()
+            });
+
+            console.log("✅ Timezone saved immediately:", newTimezone);
+        } catch (err) {
+            console.error("Error saving timezone:", err);
         }
     };
 
@@ -175,10 +199,64 @@ const SettingsPage = () => {
                     </form>
                 </section>
 
-                {/* Additional Settings Sections (Placeholder) */}
+                {/* Preferences Section */}
                 <section className="settings-section">
                     <h2 className="section-title">Preferences</h2>
-                    <p className="section-placeholder">Additional settings coming soon...</p>
+                    <form onSubmit={handleSave} className="settings-form">
+                        <div className="form-group">
+                            <div className="custom-select-container" style={{ flex: 1, position: 'relative' }}>
+                                <div
+                                    className={`custom-select-trigger ${timezone ? '' : 'placeholder'}`}
+                                    onClick={() => !saving && document.getElementById('timezone-dropdown').classList.toggle('open')}
+                                >
+                                    {timezone ? (
+                                        <>
+                                            {timezone === "UTC" && "UTC (Universal Time)"}
+                                            {timezone === "America/New_York" && "New York (EST/EDT)"}
+                                            {timezone === "America/Los_Angeles" && "Los Angeles (PST/PDT)"}
+                                            {timezone === "Europe/London" && "London (GMT/BST)"}
+                                            {timezone === "Asia/Kolkata" && "India (IST)"}
+                                            {timezone === "Asia/Tokyo" && "Tokyo (JST)"}
+                                            {timezone === "Australia/Sydney" && "Sydney (AEDT)"}
+                                        </>
+                                    ) : "Select Timezone"}
+                                    <span className="arrow">▼</span>
+                                </div>
+                                <div id="timezone-dropdown" className="custom-options">
+                                    {[
+                                        { val: "UTC", label: "UTC (Universal Time)" },
+                                        { val: "America/New_York", label: "New York (EST/EDT)" },
+                                        { val: "America/Los_Angeles", label: "Los Angeles (PST/PDT)" },
+                                        { val: "Europe/London", label: "London (GMT/BST)" },
+                                        { val: "Asia/Kolkata", label: "India (IST)" },
+                                        { val: "Asia/Tokyo", label: "Tokyo (JST)" },
+                                        { val: "Australia/Sydney", label: "Sydney (AEDT)" }
+                                    ].map(opt => (
+                                        <div
+                                            key={opt.val}
+                                            className={`custom-option ${timezone === opt.val ? 'selected' : ''}`}
+                                            onClick={() => {
+                                                handleTimezoneChange(opt.val);
+                                                document.getElementById('timezone-dropdown').classList.remove('open');
+                                            }}
+                                        >
+                                            {opt.label}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <button
+                                type="submit"
+                                className="save-btn small-btn"
+                                disabled={saving}
+                                style={{ width: 'auto', padding: '0.8rem 1.5rem', margin: 0 }}
+                            >
+                                {saving ? 'Saving...' : 'Confirm'}
+                            </button>
+                        </div>
+                        <span className="input-hint">Used for appointment scheduling</span>
+                    </form>
                 </section>
             </div>
         </div>

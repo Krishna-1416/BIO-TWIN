@@ -1,10 +1,10 @@
 fastapi
 uvicorn
-google-generativeai
 python-multipart
-pydantic
-requests
-google-api-python-client
+google-generativeai
+firebase-admin
+google-auth
 google-auth-oauthlib
 google-auth-httplib2
-firebase-admin
+google-api-python-client
+requests

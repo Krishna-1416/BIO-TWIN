@@ -42,6 +42,44 @@
   --bg-button-secondary-hover: rgba(255, 255, 255, 0.2);
 }
 
+/* --- Light Mode Overrides (Premium Glass) --- */
+/* --- Light Mode Overrides (Premium Glass) --- */
+[data-theme="light"] {
+  /* Soft, Airy Backgrounds - Cool Grey Tint */
+  --bg-body: #f0f2f5;
+
+  /* Frosted White Glass */
+  --bg-sidebar: rgba(255, 255, 255, 0.65);
+  --bg-card: rgba(255, 255, 255, 0.7);
+  --bg-card-hover: rgba(255, 255, 255, 0.9);
+
+  /* Surfaces */
+  --bg-surface: #ffffff;
+  --bg-surface-subtle: #f5f5f7;
+  --bg-button-secondary: rgba(0, 0, 0, 0.05);
+  --bg-button-secondary-hover: rgba(0, 0, 0, 0.1);
+
+  /* Typography - Sharp Contrast (Apple Style) */
+  --text-primary: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --text-tertiary: #86868b;
+  --text-muted: #a1a1a6;
+
+  /* Gradients & Accents */
+  --text-gradient-header: linear-gradient(180deg, #1d1d1f 0%, #434344 100%);
+
+  /* Borders & Shadows - Soft & Diffused */
+  --glass-border: 1px solid rgba(0, 0, 0, 0.05);
+  --glass-shine: rgba(255, 255, 255, 0.8);
+
+  /* Premium Shadows */
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 20px 40px rgba(0, 0, 0, 0.08);
+
+  /* Aurora Gradients (Pastel) */
+  --gradient-glow: radial-gradient(circle at top left, rgba(64, 156, 255, 0.2), transparent 60%);
+}
+
 /* --- Global --- */
 :root,
 html,
@@ -71,6 +109,15 @@ body {
   transition: grid-template-columns 0.3s var(--ease-spring);
   overflow: hidden;
   position: relative;
+}
+
+/* Light Mode Aurora Styles */
+[data-theme="light"] .dashboard-container::before {
+  background: radial-gradient(circle, rgba(64, 156, 255, 0.25) 0%, transparent 70%) !important;
+}
+
+[data-theme="light"] .dashboard-container::after {
+  background: radial-gradient(circle, rgba(154, 154, 230, 0.2) 0%, transparent 60%) !important;
 }
 
 /* Global Aurora Background (Shared) */
@@ -445,8 +492,8 @@ body {
 
 /* --- Main Content --- */
 .main-content {
-  padding: 6rem 3rem 2rem 3rem;
-  /* Increase top padding to clear fixed header */
+  padding: 3rem 3rem 2rem 3rem;
+  /* Reduced from 4.5rem to 3rem to minimize gap */
   overflow-y: auto;
   /* Subtle gradient background for depth */
   background: transparent;

@@ -9,11 +9,31 @@ import google_calendar
 
 calendar_service = google_calendar.GoogleCalendarService()
 
-def book_appointment(reason: str, date: str):
-    """Books a medical appointment for a specific reason and date. Date should be in ISO format (YYYY-MM-DDTHH:MM:SS)"""
-    print(f"\n[TOOL EXECUTION] Booking appointment for '{reason}' on {date}...")
+def book_appointment(reason: str, date: str, timezone: str = "UTC"):
+    """
+    Books a medical appointment.
+    Args:
+        reason: The reason for the appointment.
+        date: ISO format date string (YYYY-MM-DDTHH:MM:SS).
+        timezone: The user's timezone.
+    """
+    # Defensive Logic: If tool was called with default "UTC" but we have a real user timezone in the agent, use that.
+    # We access the global agent instance or a context var. Since agent is passed around, we'll try to find the timezone.
+    # For now, we rely on the implementation below where we set environmental context.
+    
+    final_tz = timezone
+    if hasattr(calendar_service, 'current_user_timezone') and calendar_service.current_user_timezone:
+        if timezone == "UTC": 
+            final_tz = calendar_service.current_user_timezone
+            print(f"[TOOL OVERRIDE] Agent sent UTC, overriding with context timezone: {final_tz}")
+    
+    print(f"\n[TOOL EXECUTION] Booking appointment for '{reason}' on {date} ({final_tz})...")
     if calendar_service.is_authorized():
-        return calendar_service.create_event(reason, "Medical appointment booked by Bio-Twin", date)
+        result = calendar_service.create_event(reason, "Medical appointment booked by Bio-Twin", date, timezone=final_tz)
+        # Remove link so agent doesn't spam it in chat
+        if isinstance(result, dict) and "link" in result:
+            del result["link"]
+        return result
     else:
         # Fallback to mock for demo if not signed in
         return {"status": "simulated", "message": "Google Calendar not connected. Simulated booking success.", "details": f"{reason} on {date}"}
@@ -22,7 +42,11 @@ def block_calendar_for_nap(duration_mins: int):
     """Blocks the user's calendar for a nap or rest period."""
     print(f"\n[TOOL EXECUTION] Blocking calendar for {duration_mins} mins nap.")
     if calendar_service.is_authorized():
-        return calendar_service.block_time("Rest/Nap Period", duration_mins)
+        result = calendar_service.block_time("Rest/Nap Period", duration_mins)
+        # Remove link so agent doesn't spam it in chat
+        if isinstance(result, dict) and "link" in result:
+            del result["link"]
+        return result
     else:
         return {"status": "simulated", "message": "Google Calendar not connected. Simulated block success.", "duration": duration_mins}
 
@@ -39,7 +63,12 @@ class GeminiAgent:
     def __init__(self):
         # System instruction to restrict chatbot to health-related topics only
         system_instruction = """
-        You are Bio-Twin, a specialized health assistant. Your primary purpose is to help with health, wellness, medical, and fitness-related questions.
+        You are Bio-Twin, a specialized health assistant.
+        
+        CRITICAL INSTRUCTION FOR TOOLS:
+        When using tools like 'book_appointment', you MUST explicitly pass the 'timezone' argument.
+        Look for the timezone in the 'Current Date & Time' context provided (e.g., '(Asia/Kolkata)').
+        Do NOT default to UTC unless the context doesn't specify a timezone.
         
         STRICT RULES:
         1. You ARE allowed to respond to greetings (e.g., "Hello", "Hi", "Hey there") and basic social pleasantries (e.g., "How are you?", "Nice to meet you"). Be friendly and then pivot to health if appropriate.
@@ -119,6 +148,13 @@ IMPORTANT:
         final_message = user_message + style_instruction
         if context:
             final_message = f"CONTEXT START\n{context}\nCONTEXT END\n\nUser Question: {user_message}{style_instruction}"
+            
+            # Extract timezone for tool override to fix LLM "UTC" laziness
+            if "timezone" in context:
+                calendar_service.current_user_timezone = context["timezone"]
+            else:
+                # Try to parse from system time string if explicit key missing ? No, rely on explicit key first.
+                calendar_service.current_user_timezone = None
         
         try:
             response = self.chat.send_message(final_message)
