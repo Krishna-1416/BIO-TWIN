@@ -15,9 +15,23 @@ import firebase_config
 
 app = FastAPI(title="Bio-Twin Backend")
 
+# CORS Configuration - supports both development and production
+import os
+allowed_origins = [
+    "http://localhost:5173",  # Local development
+    "http://localhost:5174",  # Alternative local port
+]
+
+# Add production frontend URL if set
+if os.getenv("FRONTEND_URL"):
+    allowed_origins.append(os.getenv("FRONTEND_URL"))
+
+# Allow all Vercel preview deployments
+allowed_origins.append("https://*.vercel.app")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Allow all for hackathon prototype
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
