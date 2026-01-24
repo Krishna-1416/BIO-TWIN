@@ -1,0 +1,6 @@
+{
+  "buildCommand": "npm ci --legacy-peer-deps && npm run build",
+  "env": {
+    "npm_config_legacy_peer_deps": "true"
+  }
+}

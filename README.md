@@ -50,9 +50,19 @@ Here is the simple lifecycle of data in Bio-Twin:
 ## 🚀 How to Run It
 
 ### Prerequisites
-*   Node.js & npm
+*   Node.js 16+ & npm 8+
 *   Python 3.10+
 *   Firebase & Supabase project keys
+*   Google Gemini API key
+
+### ⚡ Quick Start (5 minutes)
+
+**Complete setup instructions** are available in [SETUP_AND_FUNCTIONALITY.md](SETUP_AND_FUNCTIONALITY.md). This includes:
+- Step-by-step API key configuration
+- Backend (Python/FastAPI) installation
+- Frontend (React/Vite) installation
+- Full testing workflow
+- Troubleshooting guide
 
 ### 1. Setup Backend
 ```bash
@@ -63,6 +73,7 @@ python -m venv venv
 .\venv\Scripts\activate
 # Install dependencies
 pip install -r requirements.txt
+# Configure API keys in app_secrets.py
 # Run the server
 python main.py
 ```
@@ -72,12 +83,37 @@ python main.py
 cd frontend
 # Install dependencies
 npm install
+# Configure Firebase credentials in src/firebase.js
 # Start the app
 npm run dev
 ```
 
-### 3. Usage
+### 3. Verify Installation
+```bash
+# Backend should be running on http://localhost:8000
+# Frontend should be running on http://localhost:5173
+# Both should show no errors in terminal
+```
+
+### 4. Usage
 1.  Open `http://localhost:5173` in your browser.
 2.  **Login/Signup** to create your secure account.
 3.  Go to **Upload Report** and drag-and-drop a blood test or medical scan.
-4.  Watch your **Digital Twin** update and check the **History** tab for past trends!
+4.  Watch your **Digital Twin** update in real-time.
+5.  Check the **History** tab for past trends and health insights.
+
+---
+
+## 🧪 Functionality Verification
+
+Bio-Twin demonstrates the following core functionalities:
+
+✅ **User Authentication** - Secure login/signup via Firebase  
+✅ **Medical Document Processing** - Upload PDF/images of health reports  
+✅ **AI Analysis** - Gemini 3 extracts health insights from documents  
+✅ **Real-time Visualization** - 3D Digital Twin reflects health status  
+✅ **Health History** - Persistent storage of all past scans and insights  
+✅ **Calendar Integration** - Optional appointment booking  
+✅ **Responsive UI** - Works on desktop and tablets  
+
+See [SETUP_AND_FUNCTIONALITY.md](SETUP_AND_FUNCTIONALITY.md) for complete testing checklist.
