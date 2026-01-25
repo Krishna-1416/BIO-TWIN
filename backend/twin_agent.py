@@ -1,9 +1,19 @@
 import google.generativeai as genai
 from google.generativeai.types import FunctionDeclaration, Tool
-from app_secrets import GEMINI_API_KEY
+try:
+    from app_secrets import GEMINI_API_KEY
+except ImportError:
+    GEMINI_API_KEY = None
 import datetime
+import os
 
-genai.configure(api_key=GEMINI_API_KEY)
+# Prioritize environment variable (for Render), fallback to local file
+api_key = os.getenv("GEMINI_API_KEY") or GEMINI_API_KEY
+
+if not api_key:
+    raise ValueError("GEMINI_API_KEY not found in environment or app_secrets.py")
+
+genai.configure(api_key=api_key)
 
 import google_calendar
 
