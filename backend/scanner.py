@@ -1,12 +1,23 @@
 import os
 import json
 import google.generativeai as genai
-from app_secrets import GEMINI_API_KEY
+try:
+    from app_secrets import GEMINI_API_KEY
+except ImportError:
+    GEMINI_API_KEY = None
 import time
 import random
 
+# Prioritize environment variable (for Render), fallback to local file
+api_key = os.getenv("GEMINI_API_KEY") or GEMINI_API_KEY
+
+if not api_key:
+    # Not raising error here to avoid crashing entire app on import, but scan will fail
+    print("WARNING: GEMINI_API_KEY not found in environment or app_secrets.py")
+
 # Configure Gemini
-genai.configure(api_key=GEMINI_API_KEY)
+if api_key:
+    genai.configure(api_key=api_key)
 
 def scan_document(image_path: str):
     """
