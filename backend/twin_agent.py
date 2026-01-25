@@ -89,10 +89,10 @@ class GeminiAgent:
         """
         
         # Initialize Gemini model with tools and system instruction
-        # Primary: gemini-3-flash, Fallback: gemini-2.5-flash, Final Backup: gemini-1.5-flash
-        self.primary_model_name = 'models/gemini-3-flash-preview'
-        self.fallback_model_name = 'models/gemini-2.5-flash'
-        self.backup_model_name = 'models/gemini-1.5-flash'
+        # Primary: gemini-2.0-flash-exp (Fast & Smart), Fallback: gemini-1.5-flash
+        self.primary_model_name = 'models/gemini-2.0-flash-exp'
+        self.fallback_model_name = 'models/gemini-1.5-flash'
+        self.backup_model_name = 'models/gemini-1.5-flash-8b'
         self.system_instruction = system_instruction
         self.tools_list = tools_list
         
