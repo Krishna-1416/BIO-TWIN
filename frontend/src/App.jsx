@@ -119,15 +119,34 @@ function App() {
         console.error("Error loading health data from Firestore:", error);
       }
     };
-
     if (view === 'app') {
+      const loadHealthData = async () => {
+        try {
+          const q = query(
+            collection(db, 'healthScans'),
+            orderBy('timestamp', 'desc'),
+            limit(1)
+          );
+          const querySnapshot = await getDocs(q);
+          if (!querySnapshot.empty) {
+            const latestScan = querySnapshot.docs[0].data();
+            setHealthData(latestScan);
+          }
+        } catch (error) {
+          console.error("Error loading health data from Firestore:", error);
+        }
+      };
       loadHealthData();
     }
   }, [view]);
 
-  // Check Calendar Status
+  const hasCheckedCalendar = useRef(false);
+
   useEffect(() => {
     const checkAndConnectCalendar = async () => {
+      if (hasCheckedCalendar.current) return;
+      hasCheckedCalendar.current = true;
+
       try {
         const statusRes = await fetch(`${BACKEND_URL}/auth/status`);
         const statusData = await statusRes.json();
@@ -136,7 +155,7 @@ function App() {
           setIsCalendarConnected(true);
         } else if (user && view === 'app') {
           // Auto-connect to Google Calendar if user is logged in but calendar isn't connected
-          console.log("Auto-connecting to Google Calendar...");
+          // console.log("Auto-connecting to Google Calendar..."); // Silence spam
           try {
             const authRes = await fetch(`${BACKEND_URL}/auth/google`);
             const authData = await authRes.json();
@@ -164,7 +183,7 @@ function App() {
               }, 3000);
             }
           } catch (err) {
-            console.error("Auto-connect failed, user can connect manually:", err);
+            console.error("Auto-connect failed:", err);
           }
         }
       } catch (err) {
@@ -174,8 +193,6 @@ function App() {
 
     if (view === 'app' && user) {
       checkAndConnectCalendar();
-      const interval = setInterval(checkAndConnectCalendar, 10000); // Poll every 10 seconds
-      return () => clearInterval(interval);
     }
   }, [view, user]);
 
@@ -458,7 +475,7 @@ function App() {
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 120s timeout for large files
 
       console.log("Starting scan...");
       const response = await fetch(`${BACKEND_URL}/scan`, {
