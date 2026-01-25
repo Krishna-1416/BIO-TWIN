@@ -16,22 +16,20 @@ import firebase_config
 app = FastAPI(title="Bio-Twin Backend")
 
 # CORS Configuration - supports both development and production
-import os
-allowed_origins = [
-    "http://localhost:5173",  # Local development
-    "http://localhost:5174",  # Alternative local port
+# CORS Configuration
+origins = [
+    "http://localhost:5173",
+    "http://localhost:5174",
 ]
 
-# Add production frontend URL if set
+# Add specific production origin
 if os.getenv("FRONTEND_URL"):
-    allowed_origins.append(os.getenv("FRONTEND_URL"))
-
-# Allow all Vercel preview deployments
-allowed_origins.append("https://*.vercel.app")
+    origins.append(os.getenv("FRONTEND_URL"))
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=origins, 
+    allow_origin_regex=r"https://.*\.vercel\.app",  # Robust wildcard for all Vercel deployments
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -167,14 +165,20 @@ def chat_endpoint(request: ChatRequest):
     # Explicitly Note the timezone for the agent
     initial_context["note"] = f"Current Date & Time is {current_time_str} ({user_tz_str}). Use this for all scheduling."
 
-    if request.context:
-        # Update user provided context with time
-        request.context.update(initial_context)
-        response = global_agent.reply(request.message, context=request.context)
-    else:
-        # Create new context with just time
-        response = global_agent.reply(request.message, context=initial_context)
-    return {"reply": response}
+    try:
+        if request.context:
+            # Update user provided context with time
+            request.context.update(initial_context)
+            response = global_agent.reply(request.message, context=request.context)
+        else:
+            # Create new context with just time
+            response = global_agent.reply(request.message, context=initial_context)
+        return {"reply": response}
+    except Exception as e:
+        import traceback
+        print(f"ERROR in /chat: {str(e)}")
+        print(traceback.format_exc())
+        return {"reply": f"Error processing request: {str(e)}. Please check backend logs."}
 
 @app.get("/memory/analyze")
 def analyze_history():
