@@ -140,6 +140,13 @@ function App() {
           try {
             const authRes = await fetch(`${BACKEND_URL}/auth/google`);
             const authData = await authRes.json();
+
+            // Check if calendar feature is unavailable (production)
+            if (authData.error && authData.error.includes("Calendar feature not available")) {
+              console.log("Calendar feature disabled in production");
+              return; // Skip auto-connect
+            }
+
             if (authData.url) {
               // Open auth window quietly
               const authWindow = window.open(authData.url, 'google_calendar_auth', 'width=500,height=600');
@@ -176,6 +183,12 @@ function App() {
     try {
       const response = await fetch(`${BACKEND_URL}/auth/google`);
       const data = await response.json();
+
+      if (data.error) {
+        alert(data.message || "Calendar feature unavailable");
+        return;
+      }
+
       if (data.url) {
         window.open(data.url, '_blank');
       } else if (data.error) {

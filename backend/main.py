@@ -90,12 +90,19 @@ def scan_endpoint(file: UploadFile = File(...)):
 
 @app.get("/auth/google")
 def google_auth():
+    # Check if client_secret.json exists
+    if not os.path.exists('backend/client_secret.json') and not os.path.exists('client_secret.json'):
+        return {
+            "error": "Calendar feature not available", 
+            "message": "Google Calendar integration requires OAuth credentials (client_secret.json) which are only available in local development. Calendar features are disabled in production."
+        }
+    
     service = google_calendar.GoogleCalendarService()
     try:
         url = service.get_auth_url()
         return {"url": url}
     except Exception as e:
-        return {"error": str(e), "message": "Ensure client_secret.json is present in the root directory."}
+        return {"error": str(e), "message": "Calendar authentication unavailable in production."}
 
 @app.get("/auth/callback")
 def google_callback(code: str):
