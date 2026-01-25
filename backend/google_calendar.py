@@ -28,23 +28,81 @@ class GoogleCalendarService:
             return False
         return True
 
+    def get_client_config(self):
+        # Return client config from env var or file
+        if os.getenv('GOOGLE_CLIENT_SECRET'):
+            import json
+            try:
+                return json.loads(os.getenv('GOOGLE_CLIENT_SECRET'))
+            except Exception as e:
+                print(f"Error parsing GOOGLE_CLIENT_SECRET: {e}")
+        
+        # Fallback to file
+        if os.path.exists('client_secret.json'):
+            return 'client_secret.json'
+        if os.path.exists('backend/client_secret.json'):
+            return 'backend/client_secret.json'
+        return None
+
     def get_auth_url(self):
         from google_auth_oauthlib.flow import Flow
-        flow = Flow.from_client_secrets_file(
-            'client_secret.json', 
-            scopes=SCOPES,
-            redirect_uri='http://localhost:8000/auth/callback'
-        )
+        
+        client_config = self.get_client_config()
+        if not client_config:
+            raise FileNotFoundError("Client secret not found via env var or file")
+
+        # Determine redirect URI based on environment
+        # Use FRONTEND_URL if set, otherwise localhost
+        redirect_uri = 'http://localhost:8000/auth/callback'
+        if os.getenv('FRONTEND_URL'):
+            # In production, backend URL + /auth/callback
+            # We need the backend URL here, user might need to set BACKEND_PUBLIC_URL 
+            # Or we infer from FRONTEND_URL if they are on same domain (unlikely)
+            # For Render, use the public backend URL
+            backend_url = os.getenv('RENDER_EXTERNAL_URL') or "https://bio-twin.onrender.com"
+            redirect_uri = f"{backend_url}/auth/callback"
+
+        if isinstance(client_config, dict):
+             flow = Flow.from_client_config(
+                client_config,
+                scopes=SCOPES,
+                redirect_uri=redirect_uri
+            )
+        else:
+            flow = Flow.from_client_secrets_file(
+                client_config, 
+                scopes=SCOPES,
+                redirect_uri=redirect_uri
+            )
+            
         auth_url, _ = flow.authorization_url(prompt='consent', access_type='offline')
         return auth_url
 
     def save_token_from_code(self, code):
         from google_auth_oauthlib.flow import Flow
-        flow = Flow.from_client_secrets_file(
-            'client_secret.json', 
-            scopes=SCOPES,
-            redirect_uri='http://localhost:8000/auth/callback'
-        )
+        
+        client_config = self.get_client_config()
+        if not client_config:
+             raise FileNotFoundError("Client secret not found")
+
+        # Determine redirect URI (MUST match what was sent in get_auth_url)
+        redirect_uri = 'http://localhost:8000/auth/callback'
+        if os.getenv('FRONTEND_URL'):
+            backend_url = os.getenv('RENDER_EXTERNAL_URL') or "https://bio-twin.onrender.com"
+            redirect_uri = f"{backend_url}/auth/callback"
+
+        if isinstance(client_config, dict):
+            flow = Flow.from_client_config(
+                client_config,
+                scopes=SCOPES,
+                redirect_uri=redirect_uri
+            )
+        else:
+            flow = Flow.from_client_secrets_file(
+                client_config, 
+                scopes=SCOPES,
+                redirect_uri=redirect_uri
+            )
         flow.fetch_token(code=code)
         self.creds = flow.credentials
         with open('token.json', 'w') as token:
