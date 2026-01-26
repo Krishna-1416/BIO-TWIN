@@ -91,8 +91,10 @@ def scan_endpoint(file: UploadFile = File(...)):
 @app.get("/auth/google")
 def google_auth():
     # Check if client_secret.json exists (file or env var)
-    if not os.path.exists('backend/client_secret.json') \
-       and not os.path.exists('client_secret.json') \
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    secret_path = os.path.join(current_dir, 'client_secret.json')
+    
+    if not os.path.exists(secret_path) \
        and not os.getenv('GOOGLE_CLIENT_SECRET'):
         return {
             "error": "Calendar feature not available", 
@@ -219,4 +221,14 @@ def block_time(reason: str, duration_mins: int = 60):
 
 if __name__ == "__main__":
     import uvicorn
+    # DEBUG: Print API Key details (masked) to check for hidden spaces
+    key = os.getenv("GEMINI_API_KEY") or getattr(twin_agent, 'GEMINI_API_KEY', None)
+    if key:
+        print(f"🔑 DEBUG: Loaded API Key. Length: {len(key)}")
+        print(f"🔑 DEBUG: Key start: '{key[:4]}...', Key end: '...{key[-4:]}'")
+        if " " in key or "\n" in key:
+            print("❌ WARNING: Key contains spaces or newlines! Please check your secrets.")
+    else:
+        print("❌ DEBUG: No API Key found.")
+
     uvicorn.run(app, host="0.0.0.0", port=8000)
