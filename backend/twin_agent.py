@@ -1,3 +1,4 @@
+import os
 import google.generativeai as genai
 from google.generativeai.types import FunctionDeclaration, Tool
 try:
@@ -5,41 +6,26 @@ try:
 except ImportError:
     GEMINI_API_KEY = None
 import datetime
-import os
 
 # Prioritize environment variable (for Render), fallback to local file
 api_key = os.getenv("GEMINI_API_KEY") or GEMINI_API_KEY
 
 if not api_key:
-    raise ValueError("GEMINI_API_KEY not found in environment or app_secrets.py")
+    # Print warning but don't crash yet, let the agent fail gracefully if called
+    print("WARNING: GEMINI_API_KEY not found in environment or app_secrets.py")
 
-genai.configure(api_key=api_key)
+if api_key:
+    genai.configure(api_key=api_key)
 
 import google_calendar
 
 calendar_service = google_calendar.GoogleCalendarService()
 
-def book_appointment(reason: str, date: str, timezone: str = "UTC"):
-    """
-    Books a medical appointment.
-    Args:
-        reason: The reason for the appointment.
-        date: ISO format date string (YYYY-MM-DDTHH:MM:SS).
-        timezone: The user's timezone.
-    """
-    # Defensive Logic: If tool was called with default "UTC" but we have a real user timezone in the agent, use that.
-    # We access the global agent instance or a context var. Since agent is passed around, we'll try to find the timezone.
-    # For now, we rely on the implementation below where we set environmental context.
-    
-    final_tz = timezone
-    if hasattr(calendar_service, 'current_user_timezone') and calendar_service.current_user_timezone:
-        if timezone == "UTC": 
-            final_tz = calendar_service.current_user_timezone
-            print(f"[TOOL OVERRIDE] Agent sent UTC, overriding with context timezone: {final_tz}")
-    
-    print(f"\n[TOOL EXECUTION] Booking appointment for '{reason}' on {date} ({final_tz})...")
+def book_appointment(reason: str, date: str):
+    """Books a medical appointment for a specific reason and date. Date should be in ISO format (YYYY-MM-DDTHH:MM:SS)"""
+    print(f"\n[TOOL EXECUTION] Booking appointment for '{reason}' on {date}...")
     if calendar_service.is_authorized():
-        result = calendar_service.create_event(reason, "Medical appointment booked by Bio-Twin", date, timezone=final_tz)
+        result = calendar_service.create_event(reason, "Medical appointment booked by Bio-Twin", date)
         # Remove link so agent doesn't spam it in chat
         if isinstance(result, dict) and "link" in result:
             del result["link"]
@@ -73,12 +59,7 @@ class GeminiAgent:
     def __init__(self):
         # System instruction to restrict chatbot to health-related topics only
         system_instruction = """
-        You are Bio-Twin, a specialized health assistant.
-        
-        CRITICAL INSTRUCTION FOR TOOLS:
-        When using tools like 'book_appointment', you MUST explicitly pass the 'timezone' argument.
-        Look for the timezone in the 'Current Date & Time' context provided (e.g., '(Asia/Kolkata)').
-        Do NOT default to UTC unless the context doesn't specify a timezone.
+        You are Bio-Twin, a specialized health assistant. Your primary purpose is to help with health, wellness, medical, and fitness-related questions.
         
         STRICT RULES:
         1. You ARE allowed to respond to greetings (e.g., "Hello", "Hi", "Hey there") and basic social pleasantries (e.g., "How are you?", "Nice to meet you"). Be friendly and then pivot to health if appropriate.
@@ -89,10 +70,10 @@ class GeminiAgent:
         """
         
         # Initialize Gemini model with tools and system instruction
-        # Primary: gemini-2.0-flash-exp (Fast & Smart), Fallback: gemini-1.5-flash
-        self.primary_model_name = 'models/gemini-2.0-flash-exp'
-        self.fallback_model_name = 'models/gemini-1.5-flash'
-        self.backup_model_name = 'models/gemini-1.5-flash-8b'
+        # Primary: gemini-3-flash, Fallback: gemini-2.5-flash, Final Backup: gemini-1.5-flash
+        self.primary_model_name = 'models/gemini-3-flash-preview'
+        self.fallback_model_name = 'models/gemini-2.5-flash'
+        self.backup_model_name = 'models/gemini-1.5-flash'
         self.system_instruction = system_instruction
         self.tools_list = tools_list
         
@@ -158,13 +139,6 @@ IMPORTANT:
         final_message = user_message + style_instruction
         if context:
             final_message = f"CONTEXT START\n{context}\nCONTEXT END\n\nUser Question: {user_message}{style_instruction}"
-            
-            # Extract timezone for tool override to fix LLM "UTC" laziness
-            if "timezone" in context:
-                calendar_service.current_user_timezone = context["timezone"]
-            else:
-                # Try to parse from system time string if explicit key missing ? No, rely on explicit key first.
-                calendar_service.current_user_timezone = None
         
         try:
             response = self.chat.send_message(final_message)

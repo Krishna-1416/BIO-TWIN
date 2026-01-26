@@ -219,16 +219,18 @@ def block_time(reason: str, duration_mins: int = 60):
     result = service.block_time(reason, duration_mins)
     return result
 
-if __name__ == "__main__":
-    import uvicorn
+@app.on_event("startup")
+async def startup_event():
     # DEBUG: Print API Key details (masked) to check for hidden spaces
-    key = os.getenv("GEMINI_API_KEY") or getattr(twin_agent, 'GEMINI_API_KEY', None)
+    key = os.getenv("GEMINI_API_KEY")
     if key:
         print(f"🔑 DEBUG: Loaded API Key. Length: {len(key)}")
         print(f"🔑 DEBUG: Key start: '{key[:4]}...', Key end: '...{key[-4:]}'")
         if " " in key or "\n" in key:
             print("❌ WARNING: Key contains spaces or newlines! Please check your secrets.")
     else:
-        print("❌ DEBUG: No API Key found.")
+        print("❌ DEBUG: No API Key found in environment variables.")
 
+if __name__ == "__main__":
+    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

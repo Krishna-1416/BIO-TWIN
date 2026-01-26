@@ -38,10 +38,11 @@ class GoogleCalendarService:
                 print(f"Error parsing GOOGLE_CLIENT_SECRET: {e}")
         
         # Fallback to file
-        if os.path.exists('client_secret.json'):
-            return 'client_secret.json'
-        if os.path.exists('backend/client_secret.json'):
-            return 'backend/client_secret.json'
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        secret_path = os.path.join(current_dir, 'client_secret.json')
+        
+        if os.path.exists(secret_path):
+            return secret_path
         return None
 
     def get_auth_url(self):
