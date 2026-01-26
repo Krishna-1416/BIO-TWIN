@@ -245,6 +245,26 @@ def debug_config():
         "has_whitespace": " " in key or "\n" in key
     }
 
+@app.get("/debug/oauth-config")
+def debug_oauth_config():
+    """Debug endpoint to show OAuth redirect URI configuration"""
+    import os
+    frontend_url = os.getenv("FRONTEND_URL")
+    render_url = os.getenv("RENDER_EXTERNAL_URL")
+    
+    # Replicate the logic from google_calendar.py
+    redirect_uri = 'http://localhost:8000/auth/callback'
+    if frontend_url:
+        backend_url = render_url or "https://bio-twin.onrender.com"
+        redirect_uri = f"{backend_url}/auth/callback"
+    
+    return {
+        "frontend_url": frontend_url,
+        "render_external_url": render_url,
+        "computed_redirect_uri": redirect_uri,
+        "google_client_secret_set": bool(os.getenv("GOOGLE_CLIENT_SECRET"))
+    }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
