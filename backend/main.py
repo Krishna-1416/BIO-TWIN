@@ -169,16 +169,27 @@ class ChatRequest(BaseModel):
 def chat_endpoint(request: ChatRequest):
     user_id = get_user_id(request.dict())
     
+    
+    print(f"DEBUG: Chat request from user_id={user_id}")
+    
     # Initialize Agent from In-Memory Session Store
     if user_id in user_sessions:
+        print("DEBUG: Using existing agent session")
         agent = user_sessions[user_id]
     else:
+        print("DEBUG: Creating new agent session")
         # Create new agent and store in session
         agent = twin_agent.GeminiAgent(user_id=user_id)
         user_sessions[user_id] = agent
     
     # Get Reply
-    response_text = agent.reply(request.message, context=request.context)
+    print(f"DEBUG: Sending message to agent: {request.message[:50]}...")
+    try:
+        response_text = agent.reply(request.message, context=request.context)
+        print(f"DEBUG: Agent response: {str(response_text)[:50]}...")
+    except Exception as e:
+        print(f"ERROR in agent.reply: {e}")
+        response_text = "I encountered an error processing your request."
     
     # Note: We do NOT save history to DB anymore, as per user request.
     # History persists in memory within the `agent` instance in `user_sessions`.

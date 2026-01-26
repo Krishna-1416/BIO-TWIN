@@ -137,8 +137,12 @@ IMPORTANT:
         if context:
             final_message = f"CONTEXT START\n{context}\nCONTEXT END\n\nUser Question: {user_message}{style_instruction}"
         
+        print(f"DEBUG: GeminiAgent.reply called. Message length: {len(final_message)}")
         try:
+            print("DEBUG: Calling self.chat.send_message...")
             response = self.chat.send_message(final_message)
+            print(f"DEBUG: Raw Gemini response: {response}")
+            print(f"DEBUG: Response text: {response.text}")
             return response.text
         except Exception as e:
             # Check if it's a quota/rate limit error (429)
