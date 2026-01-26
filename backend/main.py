@@ -189,7 +189,8 @@ def chat_endpoint(request: ChatRequest):
         new_history.append({"role": role, "parts": parts})
         
     if firebase_config.db:
-         doc_ref.set({"history": new_history, "updated_at": firestore.SERVER_TIMESTAMP}, merge=True)
+        doc_ref = firebase_config.db.collection('users').document(user_id).collection('chats').document('current')
+        doc_ref.set({"history": new_history, "updated_at": firestore.SERVER_TIMESTAMP}, merge=True)
 
     return {"response": response_text}
 
