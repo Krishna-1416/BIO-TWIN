@@ -54,6 +54,11 @@ def get_user_id(request_data: dict = None, query_param: str = None) -> str:
     # 3. Fallback to guest (Secure in prod requires auth middleware, but this keeps prototype working)
     return "guest_user"
 
+# In-Memory Session Storage
+# Maps user_id -> GeminiAgent instance
+# This ensures conversation continuity WITHOUT permanent DB storage
+user_sessions = {}
+
 @app.get("/")
 def home():
     return {"message": "Bio-Twin Agentic Health System is Running"}
@@ -164,33 +169,19 @@ class ChatRequest(BaseModel):
 def chat_endpoint(request: ChatRequest):
     user_id = get_user_id(request.dict())
     
-    # 1. Fetch History from DB
-    history = []
-    if firebase_config.db:
-        doc_ref = firebase_config.db.collection('users').document(user_id).collection('chats').document('current')
-        doc = doc_ref.get()
-        if doc.exists:
-            data = doc.to_dict()
-            # formatting for Gemini: [{"role": "user", "parts": ["..."]}, ...]
-            history = data.get("history", [])
-
-    # 2. Init Agent
-    agent = twin_agent.GeminiAgent(history=history, user_id=user_id)
+    # Initialize Agent from In-Memory Session Store
+    if user_id in user_sessions:
+        agent = user_sessions[user_id]
+    else:
+        # Create new agent and store in session
+        agent = twin_agent.GeminiAgent(user_id=user_id)
+        user_sessions[user_id] = agent
     
-    # 3. Get Reply
+    # Get Reply
     response_text = agent.reply(request.message, context=request.context)
     
-    # 4. Save New History to DB
-    # Gemini history object needs serialization
-    new_history = []
-    for msg in agent.chat.history:
-        role = msg.role
-        parts = [p.text for p in msg.parts]
-        new_history.append({"role": role, "parts": parts})
-        
-    if firebase_config.db:
-        doc_ref = firebase_config.db.collection('users').document(user_id).collection('chats').document('current')
-        doc_ref.set({"history": new_history, "updated_at": firestore.SERVER_TIMESTAMP}, merge=True)
+    # Note: We do NOT save history to DB anymore, as per user request.
+    # History persists in memory within the `agent` instance in `user_sessions`.
 
     return {"response": response_text}
 
