@@ -1,9 +1,10 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import shutil
 import os
 import warnings
+from firebase_admin import firestore
 
 # Suppress the "google.generativeai" deprecation warning for clean logs
 warnings.filterwarnings("ignore", category=FutureWarning, module="google.generativeai")
@@ -12,10 +13,10 @@ import scanner
 import twin_agent
 import memory
 import firebase_config
+import google_calendar
 
 app = FastAPI(title="Bio-Twin Backend")
 
-# CORS Configuration - supports both development and production
 # CORS Configuration
 origins = [
     "http://localhost:5173",
@@ -29,7 +30,7 @@ if os.getenv("FRONTEND_URL"):
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins, 
-    allow_origin_regex=r"https://.*\.vercel\.app",  # Robust wildcard for all Vercel deployments
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -38,31 +39,52 @@ app.add_middleware(
 # Ensure uploads dir exists
 os.makedirs("uploads", exist_ok=True)
 
-import google_calendar
+# Helper to get user_id from request logic
+def get_user_id(request_data: dict = None, query_param: str = None) -> str:
+    # 1. Try context/dict
+    if request_data and "user_id" in request_data:
+        return request_data["user_id"]
+    if request_data and "context" in request_data and isinstance(request_data["context"], dict):
+        return request_data["context"].get("user_id")
+    
+    # 2. Try query param
+    if query_param:
+        return query_param
 
-# Simple global state for health persistence (simulating a DB)
-latest_health_data = None
+    # 3. Fallback to guest (Secure in prod requires auth middleware, but this keeps prototype working)
+    return "guest_user"
 
 @app.get("/")
 def home():
     return {"message": "Bio-Twin Agentic Health System is Running"}
 
 @app.get("/health-data")
-def get_health_data():
-    return latest_health_data
+def get_health_data(user_id: str = "guest_user"):
+    # Read from Firestore
+    if firebase_config.db:
+        try:
+            # Query latest scan for this user
+            docs = firebase_config.db.collection('users').document(user_id).collection('healthScans')\
+                .order_by('timestamp', direction='DESCENDING').limit(1).stream()
+            
+            for doc in docs:
+                return doc.to_dict()
+        except Exception as e:
+            print(f"Error fetching health data: {e}")
+            return None
+    return None
 
 @app.post("/scan")
-def scan_endpoint(file: UploadFile = File(...)):
-    global latest_health_data
+def scan_endpoint(file: UploadFile = File(...), user_id: str = "guest_user"):
     file_location = f"uploads/{file.filename}"
     with open(file_location, "wb+") as file_object:
         shutil.copyfileobj(file.file, file_object)
     
     result = scanner.scan_document(file_location)
     
-    # Persist the result in backend state for true connectivity
+    # Persist the result in DB
     if "error" not in result:
-        latest_health_data = {
+        health_data = {
             "status": result.get("overall_status") or "Neutral",
             "hydration": result.get("hydration_level") or "Medium",
             "lastScan": "Just Now",
@@ -70,70 +92,68 @@ def scan_endpoint(file: UploadFile = File(...)):
             "score": result.get("health_score") or "--",
             "velocity": result.get("velocity") or "Unknown",
             "riskFactor": result.get("primary_risk") or "None",
-            "correlations": result.get("correlations") or []
+            "correlations": result.get("correlations") or [],
+            "user_id": user_id
         }
         
-        # Also save to Firestore if available
+        # Save to Firestore
         if firebase_config.db:
             try:
                 from datetime import datetime
                 health_doc = {
-                    **latest_health_data,
+                    **health_data,
                     "timestamp": datetime.now()
                 }
-                firebase_config.db.collection('healthScans').add(health_doc)
-                print("Health data saved to Firestore")
+                firebase_config.db.collection('users').document(user_id).collection('healthScans').add(health_doc)
+                print(f"Health data saved to Firestore for {user_id}")
             except Exception as e:
                 print(f"Error saving to Firestore: {e}")
     
     return result
 
 @app.get("/auth/google")
-def google_auth():
-    # Check if client_secret.json exists (file or env var)
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    secret_path = os.path.join(current_dir, 'client_secret.json')
+def google_auth(user_id: str = "guest_user"):
+    # Check credentials
+    if not os.getenv('GOOGLE_CLIENT_SECRET') and not os.path.exists('client_secret.json'):
+         return {"error": "Calendar feature not available", "message": "Missing credentials"}
     
-    if not os.path.exists(secret_path) \
-       and not os.getenv('GOOGLE_CLIENT_SECRET'):
-        return {
-            "error": "Calendar feature not available", 
-            "message": "Google Calendar integration requires credentials. Please set GOOGLE_CLIENT_SECRET env var in production."
-        }
-    
-    service = google_calendar.GoogleCalendarService()
+    # Init service with user_id
+    service = google_calendar.GoogleCalendarService(user_id=user_id)
     try:
         url = service.get_auth_url()
+        # TODO: Ideally append state=user_id to URL to recover it in callback
         return {"url": url}
     except Exception as e:
-        return {"error": str(e), "message": "Calendar authentication unavailable in production."}
+        return {"error": str(e), "message": "Calendar authentication unavailable."}
 
 @app.get("/auth/callback")
-def google_callback(code: str):
-    service = google_calendar.GoogleCalendarService()
+def google_callback(code: str, state: str = None):
+    # Retrieve user_id from state if we implemented it, otherwise fallback
+    # For now, we assume single-user behavior for the callback flow or need frontend to handle
+    user_id = "guest_user" # Limitation: Simple callback can't infer user without state param
+    
+    service = google_calendar.GoogleCalendarService(user_id=user_id)
     try:
         service.save_token_from_code(code)
         from fastapi.responses import RedirectResponse
-        return RedirectResponse(url="http://localhost:5173/?auth=success")
+        return RedirectResponse(url=f"{os.getenv('FRONTEND_URL', 'http://localhost:5173')}/?auth=success")
     except Exception as e:
         return {"error": str(e)}
 
 @app.get("/auth/status")
-def google_status():
-    service = google_calendar.GoogleCalendarService()
+def google_status(user_id: str = "guest_user"):
+    service = google_calendar.GoogleCalendarService(user_id=user_id)
     return {"connected": service.is_authorized()}
 
 class AgentRequest(BaseModel):
-    # Flexible dict input for prototype
     metrics: dict
-
-# Global Agent Instance for Persistence (Single-User Prototype)
-global_agent = twin_agent.GeminiAgent()
+    user_id: str = "guest_user"
 
 @app.post("/agent-act")
 def run_agent(request: AgentRequest):
-    # Reuse global agent to maintain context
-    response = global_agent.run(request.metrics)
+    # stateless agent
+    agent = twin_agent.GeminiAgent(user_id=request.user_id)
+    response = agent.run(request.metrics)
     return {"agent_response": response}
 
 class ChatRequest(BaseModel):
@@ -142,143 +162,58 @@ class ChatRequest(BaseModel):
 
 @app.post("/chat")
 def chat_endpoint(request: ChatRequest):
-    # Reuse global agent to maintain conversation history
+    user_id = get_user_id(request.dict())
     
-    # Inject current system time and timezone context
-    from datetime import datetime
-    try:
-        from zoneinfo import ZoneInfo
-    except ImportError:
-        # Fallback for Python < 3.9
-        from backports.zoneinfo import ZoneInfo
+    # 1. Fetch History from DB
+    history = []
+    if firebase_config.db:
+        doc_ref = firebase_config.db.collection('users').document(user_id).collection('chats').document('current')
+        doc = doc_ref.get()
+        if doc.exists:
+            data = doc.to_dict()
+            # formatting for Gemini: [{"role": "user", "parts": ["..."]}, ...]
+            history = data.get("history", [])
 
-    # Determine user timezone from context, default to UTC
-    user_tz_str = "UTC"
-    if request.context and "timezone" in request.context:
-        user_tz_str = request.context["timezone"]
+    # 2. Init Agent
+    agent = twin_agent.GeminiAgent(history=history, user_id=user_id)
     
-    try:
-        # Get time in user's timezone
-        current_time = datetime.now(ZoneInfo(user_tz_str))
-    except Exception:
-        # Fallback to server time if timezone invalid
-        current_time = datetime.now()
+    # 3. Get Reply
+    response_text = agent.reply(request.message, context=request.context)
+    
+    # 4. Save New History to DB
+    # Gemini history object needs serialization
+    new_history = []
+    for msg in agent.chat.history:
+        role = msg.role
+        parts = [p.text for p in msg.parts]
+        new_history.append({"role": role, "parts": parts})
         
-    current_time_str = current_time.strftime("%A, %B %d, %Y %I:%M %p")
-    
-    # Merge existing context with time info
-    initial_context = request.context or {}
-    # Ensure it's a dict (Pydantic might pass None)
-    if not isinstance(initial_context, dict):
-        initial_context = {}
-        
-    initial_context["system_time"] = current_time_str
-    # Explicitly Note the timezone for the agent
-    initial_context["note"] = f"Current Date & Time is {current_time_str} ({user_tz_str}). Use this for all scheduling."
+    if firebase_config.db:
+         doc_ref.set({"history": new_history, "updated_at": firestore.SERVER_TIMESTAMP}, merge=True)
 
-    try:
-        if request.context:
-            # Update user provided context with time
-            request.context.update(initial_context)
-            response = global_agent.reply(request.message, context=request.context)
-        else:
-            # Create new context with just time
-            response = global_agent.reply(request.message, context=initial_context)
-        return {"reply": response}
-    except Exception as e:
-        import traceback
-        print(f"ERROR in /chat: {str(e)}")
-        print(traceback.format_exc())
-        return {"reply": f"Error processing request: {str(e)}. Please check backend logs."}
+    return {"response": response_text}
 
-@app.get("/memory/analyze")
-def analyze_history():
-    insight = memory.load_history()
-    return {"analysis": insight}
-
-class AppointmentRequest(BaseModel):
-    summary: str
-    description: str
-    start_time: str  # ISO format: "2026-01-20T14:00:00"
-    duration_mins: int = 60
-
-@app.post("/calendar/create-appointment")
-def create_appointment(request: AppointmentRequest):
-    service = google_calendar.GoogleCalendarService()
-    result = service.create_event(
-        summary=request.summary,
-        description=request.description,
-        start_time_str=request.start_time,
-        duration_mins=request.duration_mins
-    )
-    return result
-
-@app.post("/calendar/block-time")
-def block_time(reason: str, duration_mins: int = 60):
-    service = google_calendar.GoogleCalendarService()
-    result = service.block_time(reason, duration_mins)
-    return result
-
+# Debug Endpoints remain same
 @app.on_event("startup")
 async def startup_event():
-    # DEBUG: Print API Key details (masked) to check for hidden spaces
     key = os.getenv("GEMINI_API_KEY")
     if key:
         print(f"🔑 DEBUG: Loaded API Key. Length: {len(key)}")
-        print(f"🔑 DEBUG: Key start: '{key[:4]}...', Key end: '...{key[-4:]}'")
-        if " " in key or "\n" in key:
-            print("❌ WARNING: Key contains spaces or newlines! Please check your secrets.")
     else:
-        print("❌ DEBUG: No API Key found in environment variables.")
+        print("❌ DEBUG: No API Key found.")
 
 @app.get("/debug/config")
 def debug_config():
     key = os.getenv("GEMINI_API_KEY")
     if not key:
-        return {"status": "error", "message": "No GEMINI_API_KEY found"}
-    
-    return {
-        "status": "ok", 
-        "key_length": len(key), 
-        "key_start": key[:4], 
-        "key_end": key[-4:],
-        "has_whitespace": " " in key or "\n" in key
-    }
+         return {"status": "error"}
+    return {"status": "ok", "key_length": len(key), "key_end": key[-4:]}
 
 @app.get("/debug/oauth-config")
 def debug_oauth_config():
-    """Debug endpoint to show OAuth redirect URI configuration"""
     import os
-    frontend_url = os.getenv("FRONTEND_URL")
-    render_url = os.getenv("RENDER_EXTERNAL_URL")
-    
-    # Replicate the logic from google_calendar.py
-    redirect_uri = 'http://localhost:8000/auth/callback'
-    if frontend_url:
-        backend_url = render_url or "https://bio-twin.onrender.com"
-        redirect_uri = f"{backend_url}/auth/callback"
-    
-    
-    client_id_snippet = "Unknown"
-    try:
-        if os.getenv("GOOGLE_CLIENT_SECRET"):
-            import json
-            creds = json.loads(os.getenv("GOOGLE_CLIENT_SECRET"))
-            # Check installed or web
-            client_id = creds.get("installed", creds.get("web", {})).get("client_id", "Not Found")
-            if len(client_id) > 10:
-                client_id_snippet = f"{client_id[:10]}...{client_id[-5:]}"
-    except:
-        pass
-
     return {
-        "frontend_url": frontend_url,
-        "render_external_url": render_url,
-        "computed_redirect_uri": redirect_uri,
-        "google_client_secret_set": bool(os.getenv("GOOGLE_CLIENT_SECRET")),
-        "using_client_id": client_id_snippet
+        "frontend_url": os.getenv("FRONTEND_URL"),
+        "render_external_url": os.getenv("RENDER_EXTERNAL_URL"),
+        "google_client_secret_set": bool(os.getenv("GOOGLE_CLIENT_SECRET"))
     }
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)

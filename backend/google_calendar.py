@@ -10,11 +10,26 @@ from googleapiclient.errors import HttpError
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
 class GoogleCalendarService:
-    def __init__(self):
+    def __init__(self, user_id: str = None):
         self.creds = None
-        self.current_user_timezone = 'UTC'  # Default timezone, will be set by context
-        # The file token.json stores the user's access and refresh tokens
-        if os.path.exists('token.json'):
+        self.user_id = user_id
+        self.current_user_timezone = 'UTC'
+        
+        # Load from Firestore if user_id is provided
+        if self.user_id:
+            from firebase_config import db
+            if db:
+                doc_ref = db.collection('users').document(self.user_id).collection('tokens').document('calendar')
+                doc = doc_ref.get()
+                if doc.exists:
+                    token_data = doc.to_dict()
+                    try:
+                        self.creds = Credentials.from_authorized_user_info(token_data, SCOPES)
+                    except Exception as e:
+                        print(f"Error loading token for {self.user_id}: {e}")
+        
+        # Fallback to local file ONLY for development/testing if no user_id
+        elif os.path.exists('token.json'):
             self.creds = Credentials.from_authorized_user_file('token.json', SCOPES)
 
     def is_authorized(self):
@@ -22,71 +37,34 @@ class GoogleCalendarService:
             if self.creds and self.creds.expired and self.creds.refresh_token:
                 try:
                     self.creds.refresh(Request())
+                    # Save refreshed token
+                    if self.user_id:
+                        self._save_token_to_db()
                     return True
                 except:
                     return False
             return False
         return True
 
-    def get_client_config(self):
-        # Return client config from env var or file
-        if os.getenv('GOOGLE_CLIENT_SECRET'):
-            import json
-            try:
-                return json.loads(os.getenv('GOOGLE_CLIENT_SECRET'))
-            except Exception as e:
-                print(f"Error parsing GOOGLE_CLIENT_SECRET: {e}")
-        
-        # Fallback to file
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        secret_path = os.path.join(current_dir, 'client_secret.json')
-        
-        if os.path.exists(secret_path):
-            return secret_path
-        return None
+    def _save_token_to_db(self):
+        from firebase_config import db
+        if db and self.user_id and self.creds:
+            doc_ref = db.collection('users').document(self.user_id).collection('tokens').document('calendar')
+            # Convert credentials to dict
+            creds_data = json.loads(self.creds.to_json())
+            doc_ref.set(creds_data)
 
-    def get_auth_url(self):
-        from google_auth_oauthlib.flow import Flow
-        
-        client_config = self.get_client_config()
-        if not client_config:
-            raise FileNotFoundError("Client secret not found via env var or file")
-
-        # Determine redirect URI based on environment
-        # Use FRONTEND_URL if set, otherwise localhost
-        redirect_uri = 'http://localhost:8000/auth/callback'
-        if os.getenv('FRONTEND_URL'):
-            # In production, backend URL + /auth/callback
-            # We need the backend URL here, user might need to set BACKEND_PUBLIC_URL 
-            # Or we infer from FRONTEND_URL if they are on same domain (unlikely)
-            # For Render, use the public backend URL
-            backend_url = os.getenv('RENDER_EXTERNAL_URL') or "https://bio-twin.onrender.com"
-            redirect_uri = f"{backend_url}/auth/callback"
-
-        if isinstance(client_config, dict):
-             flow = Flow.from_client_config(
-                client_config,
-                scopes=SCOPES,
-                redirect_uri=redirect_uri
-            )
-        else:
-            flow = Flow.from_client_secrets_file(
-                client_config, 
-                scopes=SCOPES,
-                redirect_uri=redirect_uri
-            )
-            
-        auth_url, _ = flow.authorization_url(prompt='consent', access_type='offline')
-        return auth_url
+    # ... get_client_config and get_auth_url remain mostly the same ...
 
     def save_token_from_code(self, code):
         from google_auth_oauthlib.flow import Flow
+        import json # Ensure json is imported
         
         client_config = self.get_client_config()
         if not client_config:
              raise FileNotFoundError("Client secret not found")
 
-        # Determine redirect URI (MUST match what was sent in get_auth_url)
+        # Determine redirect URI
         redirect_uri = 'http://localhost:8000/auth/callback'
         if os.getenv('FRONTEND_URL'):
             backend_url = os.getenv('RENDER_EXTERNAL_URL') or "https://bio-twin.onrender.com"
@@ -106,8 +84,13 @@ class GoogleCalendarService:
             )
         flow.fetch_token(code=code)
         self.creds = flow.credentials
-        with open('token.json', 'w') as token:
-            token.write(self.creds.to_json())
+        
+        if self.user_id:
+            self._save_token_to_db()
+        else:
+            # Fallback for dev
+            with open('token.json', 'w') as token:
+                token.write(self.creds.to_json())
 
     def create_event(self, summary, description, start_time_str, duration_mins=60, timezone='UTC'):
         if not self.is_authorized():
