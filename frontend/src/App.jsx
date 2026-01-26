@@ -157,7 +157,7 @@ function App() {
           // Auto-connect to Google Calendar if user is logged in but calendar isn't connected
           // console.log("Auto-connecting to Google Calendar..."); // Silence spam
           try {
-            const authRes = await fetch(`${BACKEND_URL}/auth/google?user_id=${user.uid}`);
+            const authRes = await fetch(`${BACKEND_URL}/auth/google`);
             const authData = await authRes.json();
 
             // Check if calendar feature is unavailable (production)
@@ -172,7 +172,7 @@ function App() {
 
               // Check connection status after a few seconds
               setTimeout(() => {
-                fetch(`${BACKEND_URL}/auth/status?user_id=${user.uid}`)
+                fetch(`${BACKEND_URL}/auth/status`)
                   .then(res => res.json())
                   .then(data => {
                     if (data.connected) {
@@ -198,7 +198,7 @@ function App() {
 
   const handleConnectCalendar = async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/auth/google?user_id=${user.uid}`);
+      const response = await fetch(`${BACKEND_URL}/auth/google`);
       const data = await response.json();
 
       if (data.error) {
@@ -447,17 +447,16 @@ function App() {
           message: msgToSend,
           context: {
             ...healthData,
-            timezone: userTimezone, // <--- SEND TIMEZONE HERE
-            user_id: user ? user.uid : "guest_user"
+            timezone: userTimezone // <--- SEND TIMEZONE HERE
           }
         })
       });
       const data = await response.json();
 
-      setChatMessages(prev => [...prev, { sender: 'bot', text: data.reply }]);
+      setChatMessages(prev => [...prev, { sender: 'bot', text: data.response }]);
 
       // Speak the response if voice mode is on
-      speakResponse(data.reply);
+      speakResponse(data.response);
     } catch (e) {
       console.error(e);
       setChatMessages(prev => [...prev, { sender: 'bot', text: "Sorry, I couldn't connect to the server." }]);
@@ -479,10 +478,6 @@ function App() {
       const timeoutId = setTimeout(() => controller.abort(), 120000); // 120s timeout for large files
 
       console.log("Starting scan...");
-      if (user) {
-        formData.append('user_id', user.uid);
-      }
-
       const response = await fetch(`${BACKEND_URL}/scan`, {
         method: "POST",
         body: formData,
