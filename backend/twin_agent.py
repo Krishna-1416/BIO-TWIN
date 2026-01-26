@@ -6,7 +6,6 @@ try:
 except ImportError:
     GEMINI_API_KEY = None
 import datetime
-import google_calendar
 
 # Prioritize environment variable (for Render), fallback to local file
 api_key = os.getenv("GEMINI_API_KEY") or GEMINI_API_KEY
@@ -18,16 +17,14 @@ if not api_key:
 if api_key:
     genai.configure(api_key=api_key)
 
-def order_supplements(item_name: str):
-    """Orders health supplements."""
-    print(f"\n[TOOL EXECUTION] Ordering supplement: {item_name}...")
-    # Mock E-commerce API (remains mock as per plan)
-    return {"status": "ordered", "item": item_name, "eta": "2 days"}
+import google_calendar
 
 class GeminiAgent:
-    def __init__(self, history=None, user_id=None):
+    def __init__(self, user_id: str = "guest_user"):
+        self.user_id = user_id
+        self.calendar_service = google_calendar.GoogleCalendarService(user_id=self.user_id)
         # System instruction to restrict chatbot to health-related topics only
-        self.system_instruction = """
+        system_instruction = """
         You are Bio-Twin, a specialized health assistant. Your primary purpose is to help with health, wellness, medical, and fitness-related questions.
         
         STRICT RULES:
@@ -38,48 +35,44 @@ class GeminiAgent:
         5. Always maintain a friendly, supportive, and professional tone.
         """
         
-        self.user_id = user_id
-        # Initialize User-Specific Calendar Service
-        self.calendar_service = google_calendar.GoogleCalendarService(user_id=self.user_id)
-        
-        # Define Instance-Level Tools (bound to this user's calendar)
-        self.tools_list = [self.book_appointment, self.block_calendar_for_nap, order_supplements]
-
         # Initialize Gemini model with tools and system instruction
-        # User requested specific models
+        # Primary: gemini-3-flash, Fallback: gemini-2.5-flash, Final Backup: gemini-1.5-flash
         self.primary_model_name = 'models/gemini-3-flash-preview'
         self.fallback_model_name = 'models/gemini-2.5-flash'
         self.backup_model_name = 'models/gemini-1.5-flash'
+        self.system_instruction = system_instruction
+        self.tools_list = [self.book_appointment, self.block_calendar_for_nap, self.order_supplements]
         
-        self._init_model(self.primary_model_name, history or [])
-
-    def _init_model(self, model_name, history):
+        # Try primary model first
         try:
             self.model = genai.GenerativeModel(
-                model_name=model_name,
+                model_name=self.primary_model_name,
                 tools=self.tools_list,
-                system_instruction=self.system_instruction
+                system_instruction=system_instruction
             )
-            self.current_model = model_name
-            self.chat = self.model.start_chat(history=history, enable_automatic_function_calling=True)
+            self.current_model = self.primary_model_name
         except Exception as e:
-            print(f"Error initializing model {model_name}: {e}")
-            if model_name == self.primary_model_name:
-                print(f"Falling back to {self.fallback_model_name}")
-                self._init_model(self.fallback_model_name, history)
-            elif model_name == self.fallback_model_name:
-                print(f"Falling back to {self.backup_model_name}")
-                self._init_model(self.backup_model_name, history)
+            print(f"Primary model failed, using fallback: {e}")
+            self.model = genai.GenerativeModel(
+                model_name=self.fallback_model_name,
+                tools=self.tools_list,
+                system_instruction=system_instruction
+            )
+            self.current_model = self.fallback_model_name
+            
+        self.chat = self.model.start_chat(enable_automatic_function_calling=True)
 
     def book_appointment(self, reason: str, date: str):
         """Books a medical appointment for a specific reason and date. Date should be in ISO format (YYYY-MM-DDTHH:MM:SS)"""
         print(f"\n[TOOL EXECUTION] Booking appointment for '{reason}' on {date}...")
         if self.calendar_service.is_authorized():
             result = self.calendar_service.create_event(reason, "Medical appointment booked by Bio-Twin", date)
+            # Remove link so agent doesn't spam it in chat
             if isinstance(result, dict) and "link" in result:
                 del result["link"]
             return result
         else:
+            # Fallback to mock for demo if not signed in
             return {"status": "simulated", "message": "Google Calendar not connected. Simulated booking success.", "details": f"{reason} on {date}"}
 
     def block_calendar_for_nap(self, duration_mins: int):
@@ -87,11 +80,18 @@ class GeminiAgent:
         print(f"\n[TOOL EXECUTION] Blocking calendar for {duration_mins} mins nap.")
         if self.calendar_service.is_authorized():
             result = self.calendar_service.block_time("Rest/Nap Period", duration_mins)
+            # Remove link so agent doesn't spam it in chat
             if isinstance(result, dict) and "link" in result:
                 del result["link"]
             return result
         else:
             return {"status": "simulated", "message": "Google Calendar not connected. Simulated block success.", "duration": duration_mins}
+
+    def order_supplements(self, item_name: str):
+        """Orders health supplements."""
+        print(f"\n[TOOL EXECUTION] Ordering supplement: {item_name}...")
+        # Mock E-commerce API (remains mock as per plan)
+        return {"status": "ordered", "item": item_name, "eta": "2 days"}
 
     def run(self, health_context: dict):
         """
@@ -137,12 +137,8 @@ IMPORTANT:
         if context:
             final_message = f"CONTEXT START\n{context}\nCONTEXT END\n\nUser Question: {user_message}{style_instruction}"
         
-        print(f"DEBUG: GeminiAgent.reply called. Message length: {len(final_message)}")
         try:
-            print("DEBUG: Calling self.chat.send_message...")
             response = self.chat.send_message(final_message)
-            print(f"DEBUG: Raw Gemini response: {response}")
-            print(f"DEBUG: Response text: {response.text}")
             return response.text
         except Exception as e:
             # Check if it's a quota/rate limit error (429)
@@ -151,7 +147,13 @@ IMPORTANT:
                 
                 # Switch to fallback model
                 try:
-                    self._init_model(self.fallback_model_name, self.chat.history)
+                    self.model = genai.GenerativeModel(
+                        model_name=self.fallback_model_name,
+                        tools=self.tools_list,
+                        system_instruction=self.system_instruction
+                    )
+                    self.current_model = self.fallback_model_name
+                    self.chat = self.model.start_chat(enable_automatic_function_calling=True)
                     
                     # Retry with fallback
                     response = self.chat.send_message(final_message)
@@ -162,7 +164,13 @@ IMPORTANT:
                         print(f"[FINAL BACKUP] Fallback model also exhausted. Switching to {self.backup_model_name}...")
                         
                         # Switch to backup model (gemini-1.5-flash)
-                        self._init_model(self.backup_model_name, self.chat.history)
+                        self.model = genai.GenerativeModel(
+                            model_name=self.backup_model_name,
+                            tools=self.tools_list,
+                            system_instruction=self.system_instruction
+                        )
+                        self.current_model = self.backup_model_name
+                        self.chat = self.model.start_chat(enable_automatic_function_calling=True)
                         
                         # Retry with backup
                         response = self.chat.send_message(final_message)
@@ -176,7 +184,7 @@ IMPORTANT:
 
 if __name__ == "__main__":
     # Test Scenario
-    agent = GeminiAgent(user_id="test_user")
+    agent = GeminiAgent()
     
     # Simulate data from Scanner
     dummy_health_data = {
