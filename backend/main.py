@@ -258,11 +258,25 @@ def debug_oauth_config():
         backend_url = render_url or "https://bio-twin.onrender.com"
         redirect_uri = f"{backend_url}/auth/callback"
     
+    
+    client_id_snippet = "Unknown"
+    try:
+        if os.getenv("GOOGLE_CLIENT_SECRET"):
+            import json
+            creds = json.loads(os.getenv("GOOGLE_CLIENT_SECRET"))
+            # Check installed or web
+            client_id = creds.get("installed", creds.get("web", {})).get("client_id", "Not Found")
+            if len(client_id) > 10:
+                client_id_snippet = f"{client_id[:10]}...{client_id[-5:]}"
+    except:
+        pass
+
     return {
         "frontend_url": frontend_url,
         "render_external_url": render_url,
         "computed_redirect_uri": redirect_uri,
-        "google_client_secret_set": bool(os.getenv("GOOGLE_CLIENT_SECRET"))
+        "google_client_secret_set": bool(os.getenv("GOOGLE_CLIENT_SECRET")),
+        "using_client_id": client_id_snippet
     }
 
 if __name__ == "__main__":
