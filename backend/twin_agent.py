@@ -12,6 +12,7 @@ import google_calendar
 api_key = os.getenv("GEMINI_API_KEY") or GEMINI_API_KEY
 
 if not api_key:
+    # Print warning but don't crash yet, let the agent fail gracefully if called
     print("WARNING: GEMINI_API_KEY not found in environment or app_secrets.py")
 
 if api_key:
@@ -27,9 +28,9 @@ class GeminiAgent:
     def __init__(self, history=None, user_id=None):
         # System instruction to restrict chatbot to health-related topics only
         self.system_instruction = """
-        You are Bio-Twin, an intelligent AI Health Agent designed to analyze health biomarkers, predict trends, and provide actionable wellness advice.
+        You are Bio-Twin, a specialized health assistant. Your primary purpose is to help with health, wellness, medical, and fitness-related questions.
         
-        CRITICAL INSTRUCTIONS:
+        STRICT RULES:
         1. You ARE allowed to respond to greetings (e.g., "Hello", "Hi", "Hey there") and basic social pleasantries (e.g., "How are you?", "Nice to meet you"). Be friendly and then pivot to health if appropriate.
         2. For knowledge-based questions, ONLY answer if they are related to: health, medicine, fitness, nutrition, mental wellness, biomarkers, symptoms, treatments, appointments, supplements, exercise, sleep, stress management, and general wellbeing.
         3. If a user asks a factual or advisory question about ANY topic outside of health (e.g., weather, sports, politics, entertainment, coding, etc.), politely decline and redirect them to health topics.
@@ -45,9 +46,10 @@ class GeminiAgent:
         self.tools_list = [self.book_appointment, self.block_calendar_for_nap, order_supplements]
 
         # Initialize Gemini model with tools and system instruction
-        # Primary: gemini-2.0-flash, Fallback: gemini-1.5-flash
-        self.primary_model_name = 'models/gemini-2.0-flash'
-        self.fallback_model_name = 'models/gemini-1.5-flash'
+        # User requested specific models
+        self.primary_model_name = 'models/gemini-3-flash-preview'
+        self.fallback_model_name = 'models/gemini-2.5-flash'
+        self.backup_model_name = 'models/gemini-1.5-flash'
         
         self._init_model(self.primary_model_name, history or [])
 
@@ -65,6 +67,9 @@ class GeminiAgent:
             if model_name == self.primary_model_name:
                 print(f"Falling back to {self.fallback_model_name}")
                 self._init_model(self.fallback_model_name, history)
+            elif model_name == self.fallback_model_name:
+                print(f"Falling back to {self.backup_model_name}")
+                self._init_model(self.backup_model_name, history)
 
     def book_appointment(self, reason: str, date: str):
         """Books a medical appointment for a specific reason and date. Date should be in ISO format (YYYY-MM-DDTHH:MM:SS)"""
@@ -119,15 +124,24 @@ class GeminiAgent:
         Enforces health-only topic restriction.
         Automatically falls back through multiple models on quota errors.
         """
-        final_message = user_message
+        # Style instruction with health-only enforcement
+        style_instruction = """
+        
+IMPORTANT: 
+1. Reply in a friendly, short, and pointwise way.
+2. Respond naturally to greetings or "How are you?".
+3. If a question is clearly about a non-health topic (e.g., coding, sports, history), politely decline with: "I'm Bio-Twin, your health assistant. I can only help with health, wellness, and medical questions. Please ask me something related to your health!"
+        """
+        
+        final_message = user_message + style_instruction
         if context:
-            final_message = f"Context: {context}\n\nUser Message: {user_message}"
-            
+            final_message = f"CONTEXT START\n{context}\nCONTEXT END\n\nUser Question: {user_message}{style_instruction}"
+        
         try:
             response = self.chat.send_message(final_message)
             return response.text
         except Exception as e:
-            # Check if it's a quota/rate limit error (429) or persistent error
+            # Check if it's a quota/rate limit error (429)
             if "429" in str(e) or "quota" in str(e).lower() or "ResourceExhausted" in str(e):
                 print(f"[FALLBACK] Primary model quota exhausted. Switching to {self.fallback_model_name}...")
                 
@@ -140,9 +154,17 @@ class GeminiAgent:
                     return response.text
                 except Exception as e2:
                     # Check if fallback also hit rate limit
-                    if "429" in str(e2) or "quota" in str(e2).lower():
-                        return "I'm currently overloaded with requests. Please try again in a few minutes."
+                    if "429" in str(e2) or "quota" in str(e2).lower() or "ResourceExhausted" in str(e2):
+                        print(f"[FINAL BACKUP] Fallback model also exhausted. Switching to {self.backup_model_name}...")
+                        
+                        # Switch to backup model (gemini-1.5-flash)
+                        self._init_model(self.backup_model_name, self.chat.history)
+                        
+                        # Retry with backup
+                        response = self.chat.send_message(final_message)
+                        return response.text
                     else:
+                        # Re-raise non-quota errors from fallback
                         raise e2
             else:
                 # Re-raise non-quota errors
