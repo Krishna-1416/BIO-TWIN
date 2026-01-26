@@ -231,6 +231,20 @@ async def startup_event():
     else:
         print("❌ DEBUG: No API Key found in environment variables.")
 
+@app.get("/debug/config")
+def debug_config():
+    key = os.getenv("GEMINI_API_KEY")
+    if not key:
+        return {"status": "error", "message": "No GEMINI_API_KEY found"}
+    
+    return {
+        "status": "ok", 
+        "key_length": len(key), 
+        "key_start": key[:4], 
+        "key_end": key[-4:],
+        "has_whitespace": " " in key or "\n" in key
+    }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
