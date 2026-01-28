@@ -150,6 +150,54 @@ def google_status(user_id: str = "guest_user"):
     service = google_calendar.GoogleCalendarService(user_id=user_id)
     return {"connected": service.is_authorized()}
 
+# --- Calendar Appointment Endpoints ---
+
+class CreateAppointmentRequest(BaseModel):
+    summary: str
+    description: str = ""
+    start_time: str  # ISO format: YYYY-MM-DDTHH:MM:SS
+    duration_mins: int = 60
+    timezone: str = "UTC"
+    user_id: str = "guest_user"
+
+@app.post("/calendar/create-appointment")
+def create_appointment(request: CreateAppointmentRequest):
+    service = google_calendar.GoogleCalendarService(user_id=request.user_id)
+    
+    if not service.is_authorized():
+        return {"status": "error", "message": "Calendar not connected. Please connect your Google Calendar first."}
+    
+    result = service.create_event(
+        summary=request.summary,
+        description=request.description,
+        start_time_str=request.start_time,
+        duration_mins=request.duration_mins,
+        timezone=request.timezone
+    )
+    return result
+
+class BlockTimeRequest(BaseModel):
+    reason: str
+    duration_mins: int = 60
+    timezone: str = "UTC"
+    user_id: str = "guest_user"
+
+@app.post("/calendar/block-time")
+def block_calendar_time(request: BlockTimeRequest):
+    service = google_calendar.GoogleCalendarService(user_id=request.user_id)
+    
+    if not service.is_authorized():
+        return {"status": "error", "message": "Calendar not connected. Please connect your Google Calendar first."}
+    
+    # Set timezone on the service
+    service.current_user_timezone = request.timezone
+    
+    result = service.block_time(
+        reason=request.reason,
+        duration_mins=request.duration_mins
+    )
+    return result
+
 class AgentRequest(BaseModel):
     metrics: dict
     user_id: str = "guest_user"
@@ -248,3 +296,8 @@ def debug_oauth_config():
         "using_client_id": client_id_snippet,
         "json_parsing_error": parsing_error
     }
+
+# Entry point for running with: python main.py
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)

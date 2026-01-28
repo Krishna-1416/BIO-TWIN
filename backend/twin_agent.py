@@ -22,6 +22,7 @@ import google_calendar
 class GeminiAgent:
     def __init__(self, user_id: str = "guest_user"):
         self.user_id = user_id
+        self.user_timezone = "UTC"  # Default timezone, updated from context
         self.calendar_service = google_calendar.GoogleCalendarService(user_id=self.user_id)
         # System instruction to restrict chatbot to health-related topics only
         system_instruction = """
@@ -64,9 +65,14 @@ class GeminiAgent:
 
     def book_appointment(self, reason: str, date: str):
         """Books a medical appointment for a specific reason and date. Date should be in ISO format (YYYY-MM-DDTHH:MM:SS)"""
-        print(f"\n[TOOL EXECUTION] Booking appointment for '{reason}' on {date}...")
+        print(f"\n[TOOL EXECUTION] Booking appointment for '{reason}' on {date} (timezone: {self.user_timezone})...")
         if self.calendar_service.is_authorized():
-            result = self.calendar_service.create_event(reason, "Medical appointment booked by Bio-Twin", date)
+            result = self.calendar_service.create_event(
+                reason, 
+                "Medical appointment booked by Bio-Twin", 
+                date,
+                timezone=self.user_timezone
+            )
             # Remove link so agent doesn't spam it in chat
             if isinstance(result, dict) and "link" in result:
                 del result["link"]
@@ -77,8 +83,10 @@ class GeminiAgent:
 
     def block_calendar_for_nap(self, duration_mins: int):
         """Blocks the user's calendar for a nap or rest period."""
-        print(f"\n[TOOL EXECUTION] Blocking calendar for {duration_mins} mins nap.")
+        print(f"\n[TOOL EXECUTION] Blocking calendar for {duration_mins} mins nap (timezone: {self.user_timezone}).")
         if self.calendar_service.is_authorized():
+            # Set timezone on calendar service before blocking
+            self.calendar_service.current_user_timezone = self.user_timezone
             result = self.calendar_service.block_time("Rest/Nap Period", duration_mins)
             # Remove link so agent doesn't spam it in chat
             if isinstance(result, dict) and "link" in result:
@@ -135,7 +143,23 @@ IMPORTANT:
         
         final_message = user_message + style_instruction
         if context:
-            final_message = f"CONTEXT START\n{context}\nCONTEXT END\n\nUser Question: {user_message}{style_instruction}"
+            # Extract timezone from context if available
+            if isinstance(context, dict):
+                if "timezone" in context:
+                    self.user_timezone = context["timezone"]
+                    print(f"[TIMEZONE] Using timezone from context: {self.user_timezone}")
+                
+                # Extract current datetime for accurate scheduling
+                current_datetime = context.get("currentDateTime", "")
+                if current_datetime:
+                    print(f"[DATETIME] Current time in user's timezone: {current_datetime}")
+                    # Inject current datetime into the context for the AI
+                    datetime_info = f"\n\nCURRENT DATE/TIME INFO:\n- Current time: {current_datetime}\n- Timezone: {self.user_timezone}\nUse this as reference when scheduling appointments. 'Tomorrow' means the day after this date.\n"
+                    final_message = f"CONTEXT START\n{context}{datetime_info}\nCONTEXT END\n\nUser Question: {user_message}{style_instruction}"
+                else:
+                    final_message = f"CONTEXT START\n{context}\nCONTEXT END\n\nUser Question: {user_message}{style_instruction}"
+            else:
+                final_message = f"CONTEXT START\n{context}\nCONTEXT END\n\nUser Question: {user_message}{style_instruction}"
         
         try:
             response = self.chat.send_message(final_message)

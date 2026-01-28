@@ -9,6 +9,7 @@ import AuthPage from './components/AuthPage'
 import NameCollectionModal from './components/NameCollectionModal'
 import SettingsPage from './components/SettingsPage'
 import HistoryPage from './components/HistoryPage'
+import TrendsPage from './components/TrendsPage'
 import ReactMarkdown from 'react-markdown'
 import { db, auth } from './firebase'
 import { supabase } from './supabase'
@@ -227,7 +228,9 @@ function App() {
           summary,
           description,
           start_time: startTime,
-          duration_mins: durationMins
+          duration_mins: durationMins,
+          timezone: userTimezone,
+          user_id: user?.uid || "guest_user"
         })
       });
       const data = await response.json();
@@ -251,7 +254,12 @@ function App() {
       const response = await fetch(`${BACKEND_URL}/calendar/block-time`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason, duration_mins: durationMins })
+        body: JSON.stringify({
+          reason,
+          duration_mins: durationMins,
+          timezone: userTimezone,
+          user_id: user?.uid || "guest_user"
+        })
       });
       const data = await response.json();
       if (data.status === "success") {
@@ -440,6 +448,18 @@ function App() {
     setIsChatThinking(true);
 
     try {
+      // Get current date/time in user's timezone for accurate scheduling
+      const now = new Date();
+      const currentDateTime = now.toLocaleString('en-US', {
+        timeZone: userTimezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
+
       const response = await fetch(`${BACKEND_URL}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -447,7 +467,9 @@ function App() {
           message: msgToSend,
           context: {
             ...healthData,
-            timezone: userTimezone // <--- SEND TIMEZONE HERE
+            timezone: userTimezone,
+            currentDateTime: currentDateTime,
+            currentDateISO: now.toISOString()
           }
         })
       });
@@ -674,6 +696,15 @@ function App() {
           </a>
           <a
             href="#"
+            className={`nav-item ${view === 'trends' ? 'active' : ''}`}
+            title="Trends"
+            onClick={() => setView('trends')}
+          >
+            <span className="material-icons">show_chart</span>
+            {!isSidebarCollapsed && <span>Trends</span>}
+          </a>
+          <a
+            href="#"
             className={`nav-item ${view === 'history' ? 'active' : ''}`}
             title="History"
             onClick={() => setView('history')}
@@ -750,6 +781,8 @@ function App() {
       <main className="main-content" style={{ overflowY: 'auto' }}>
         {view === 'settings' ? (
           <SettingsPage />
+        ) : view === 'trends' ? (
+          <TrendsPage />
         ) : view === 'history' ? (
           <HistoryPage />
         ) : (
