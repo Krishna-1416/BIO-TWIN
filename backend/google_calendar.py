@@ -10,7 +10,8 @@ from googleapiclient.errors import HttpError
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
 class GoogleCalendarService:
-    def __init__(self):
+    def __init__(self, user_id: str = "guest_user"):
+        self.user_id = user_id
         self.creds = None
         self.current_user_timezone = 'UTC'  # Default timezone, will be set by context
         # The file token.json stores the user's access and refresh tokens
