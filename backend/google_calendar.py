@@ -1,10 +1,15 @@
 import os.path
 import datetime
+import json
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+
+# Firebase Admin SDK for token storage
+import firebase_admin
+from firebase_admin import firestore
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = ['https://www.googleapis.com/auth/calendar']
@@ -14,17 +19,67 @@ class GoogleCalendarService:
         self.user_id = user_id
         self.creds = None
         self.current_user_timezone = 'UTC'  # Default timezone, will be set by context
-        # The file token.json stores the user's access and refresh tokens
+        
+        # Get Firestore client for token storage
+        self.db = firestore.client()
+        
+        # Try to load tokens from Firestore first, fallback to local file for dev
+        self._load_credentials()
+    
+    def _load_credentials(self):
+        """Load credentials from Firestore (production) or local file (development)"""
+        # Try Firestore first (works on Render)
+        try:
+            token_doc = self.db.collection('oauth_tokens').document(self.user_id).get()
+            if token_doc.exists:
+                token_data = token_doc.to_dict()
+                if token_data and 'token' in token_data:
+                    self.creds = Credentials.from_authorized_user_info(token_data['token'], SCOPES)
+                    print(f"[CALENDAR] Loaded credentials from Firestore for user: {self.user_id}")
+                    return
+        except Exception as e:
+            print(f"[CALENDAR] Could not load from Firestore: {e}")
+        
+        # Fallback to local file for development
         if os.path.exists('token.json'):
             self.creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+            print(f"[CALENDAR] Loaded credentials from local token.json")
+    
+    def _save_credentials(self):
+        """Save credentials to both Firestore (for production) and local file (for dev)"""
+        if not self.creds:
+            return
+            
+        token_info = json.loads(self.creds.to_json())
+        
+        # Save to Firestore (primary - works on Render)
+        try:
+            self.db.collection('oauth_tokens').document(self.user_id).set({
+                'token': token_info,
+                'updated_at': datetime.datetime.now(),
+                'user_id': self.user_id
+            })
+            print(f"[CALENDAR] Saved credentials to Firestore for user: {self.user_id}")
+        except Exception as e:
+            print(f"[CALENDAR] Error saving to Firestore: {e}")
+        
+        # Also save locally for development convenience
+        try:
+            with open('token.json', 'w') as token:
+                token.write(self.creds.to_json())
+        except Exception as e:
+            print(f"[CALENDAR] Could not save local token file: {e}")
 
     def is_authorized(self):
         if not self.creds or not self.creds.valid:
             if self.creds and self.creds.expired and self.creds.refresh_token:
                 try:
                     self.creds.refresh(Request())
+                    # Save refreshed token
+                    self._save_credentials()
                     return True
-                except:
+                except Exception as e:
+                    print(f"[CALENDAR] Token refresh failed: {e}")
                     return False
             return False
         return True
@@ -107,8 +162,9 @@ class GoogleCalendarService:
             )
         flow.fetch_token(code=code)
         self.creds = flow.credentials
-        with open('token.json', 'w') as token:
-            token.write(self.creds.to_json())
+        
+        # Save to Firestore and local file
+        self._save_credentials()
 
     def create_event(self, summary, description, start_time_str, duration_mins=60, timezone='UTC'):
         if not self.is_authorized():
