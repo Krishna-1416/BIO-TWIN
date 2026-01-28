@@ -215,8 +215,36 @@ def debug_config():
 @app.get("/debug/oauth-config")
 def debug_oauth_config():
     import os
+    import json
+    
+    frontend_url = os.getenv("FRONTEND_URL")
+    render_url = os.getenv("RENDER_EXTERNAL_URL")
+    
+    # Replicate lookup
+    redirect_uri = "http://localhost:8000/auth/callback"
+    if frontend_url:
+        backend_url = render_url or "https://bio-twin.onrender.com"
+        redirect_uri = f"{backend_url}/auth/callback"
+        
+    client_id_snippet = "Unknown"
+    parsing_error = None
+    
+    try:
+        secret = os.getenv("GOOGLE_CLIENT_SECRET")
+        if secret:
+            creds = json.loads(secret)
+            # Check installed or web
+            client_id = creds.get("installed", creds.get("web", {})).get("client_id", "Not Found")
+            if len(client_id) > 10:
+                client_id_snippet = f"{client_id[:10]}...{client_id[-5:]}"
+    except Exception as e:
+        parsing_error = str(e)
+
     return {
-        "frontend_url": os.getenv("FRONTEND_URL"),
-        "render_external_url": os.getenv("RENDER_EXTERNAL_URL"),
-        "google_client_secret_set": bool(os.getenv("GOOGLE_CLIENT_SECRET"))
+        "frontend_url": frontend_url,
+        "render_external_url": render_url,
+        "computed_redirect_uri": redirect_uri,
+        "google_client_secret_set": bool(os.getenv("GOOGLE_CLIENT_SECRET")),
+        "using_client_id": client_id_snippet,
+        "json_parsing_error": parsing_error
     }
