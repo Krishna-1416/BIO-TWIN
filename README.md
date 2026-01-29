@@ -57,12 +57,11 @@ Here is the simple lifecycle of data in Bio-Twin:
 
 ### ⚡ Quick Start (5 minutes)
 
-**Complete setup instructions** are available in [SETUP_AND_FUNCTIONALITY.md](SETUP_AND_FUNCTIONALITY.md). This includes:
-- Step-by-step API key configuration
-- Backend (Python/FastAPI) installation
-- Frontend (React/Vite) installation
-- Full testing workflow
-- Troubleshooting guide
+**Prerequisites:**
+- Node.js 16+ & npm 8+
+- Python 3.10+
+- Firebase & Supabase project keys
+- Google Gemini API key
 
 ### 1. Setup Backend
 ```bash
@@ -110,10 +109,9 @@ Bio-Twin demonstrates the following core functionalities:
 
 ✅ **User Authentication** - Secure login/signup via Firebase  
 ✅ **Medical Document Processing** - Upload PDF/images of health reports  
-✅ **AI Analysis** - Gemini 3 extracts health insights from documents  
+✅ **AI Analysis** - Gemini extracts health insights from documents  
 ✅ **Real-time Visualization** - 3D Digital Twin reflects health status  
 ✅ **Health History** - Persistent storage of all past scans and insights  
-✅ **Calendar Integration** - Optional appointment booking  
-✅ **Responsive UI** - Works on desktop and tablets  
-
-See [SETUP_AND_FUNCTIONALITY.md](SETUP_AND_FUNCTIONALITY.md) for complete testing checklist.
+✅ **Calendar Integration** - Google Calendar appointment booking  
+✅ **Voice Agent** - Hands-free health queries with speech recognition  
+✅ **Responsive UI** - Works on desktop and tablets
