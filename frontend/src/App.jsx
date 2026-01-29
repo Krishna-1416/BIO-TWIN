@@ -42,6 +42,7 @@ function App() {
   const fileInputRef = useRef(null);
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // User State
   const [user, setUser] = useState(null);
@@ -675,8 +676,29 @@ function App() {
         </div>
       </div>
 
+      {/* Mobile Header */}
+      <div className="mobile-header">
+        <button
+          className="hamburger-btn"
+          onClick={() => setIsMobileMenuOpen(true)}
+          aria-label="Open menu"
+        >
+          <span className="material-icons">menu</span>
+        </button>
+        <div className="brand-text">
+          <span className="name">BioTwin</span>
+        </div>
+        <div style={{ width: '44px' }}></div> {/* Spacer for centering */}
+      </div>
+
+      {/* Mobile Overlay */}
+      <div
+        className={`mobile-overlay ${isMobileMenuOpen ? 'active' : ''}`}
+        onClick={() => setIsMobileMenuOpen(false)}
+      ></div>
+
       {/* Sidebar Navigation */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${isMobileMenuOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
           <button
             className="sidebar-toggle"
@@ -692,7 +714,7 @@ function App() {
             href="#"
             className={`nav-item ${view === 'app' && activeTab === 'scan' ? 'active' : ''}`}
             title="Upload Report"
-            onClick={() => { setView('app'); setActiveTab('scan'); }}
+            onClick={() => { setView('app'); setActiveTab('scan'); setIsMobileMenuOpen(false); }}
           >
             <span className="material-icons">cloud_upload</span>
             {!isSidebarCollapsed && <span>Upload Report</span>}
@@ -701,7 +723,7 @@ function App() {
             href="#"
             className={`nav-item ${view === 'app' && activeTab === 'dashboard' ? 'active' : ''}`}
             title="Dashboard"
-            onClick={() => { setView('app'); setActiveTab('dashboard'); }}
+            onClick={() => { setView('app'); setActiveTab('dashboard'); setIsMobileMenuOpen(false); }}
           >
             <span className="material-icons">dashboard</span>
             {!isSidebarCollapsed && <span>Dashboard</span>}
@@ -710,7 +732,7 @@ function App() {
             href="#"
             className={`nav-item ${view === 'trends' ? 'active' : ''}`}
             title="Trends"
-            onClick={() => setView('trends')}
+            onClick={() => { setView('trends'); setIsMobileMenuOpen(false); }}
           >
             <span className="material-icons">show_chart</span>
             {!isSidebarCollapsed && <span>Trends</span>}
@@ -719,7 +741,7 @@ function App() {
             href="#"
             className={`nav-item ${view === 'history' ? 'active' : ''}`}
             title="History"
-            onClick={() => setView('history')}
+            onClick={() => { setView('history'); setIsMobileMenuOpen(false); }}
           >
             <span className="material-icons">history</span>
             {!isSidebarCollapsed && <span>History</span>}

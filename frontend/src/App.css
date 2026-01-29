@@ -2309,3 +2309,342 @@ body {
     box-shadow: 0 0 0 0 rgba(255, 59, 48, 0);
   }
 }
+
+/* ============================================
+   MOBILE RESPONSIVE DESIGN
+   ============================================ */
+
+/* --- Tablet Breakpoint (768px) --- */
+@media (max-width: 768px) {
+
+  /* Sidebar - Collapse to icon-only or hide */
+  .sidebar {
+    width: 70px;
+    padding: 1rem 0.5rem;
+  }
+
+  .sidebar .nav-link span,
+  .sidebar .user-profile-section span,
+  .sidebar-theme-toggle span {
+    display: none;
+  }
+
+  .sidebar .nav-link {
+    justify-content: center;
+    padding: 1rem;
+  }
+
+  .sidebar .user-profile-section {
+    justify-content: center;
+    padding: 0.75rem;
+  }
+
+  /* Main Content - Adjust for smaller sidebar */
+  .main-content {
+    margin-left: 70px;
+    padding: 1.5rem;
+  }
+
+  /* Dashboard Grid - 2 columns */
+  .dashboard-grid,
+  .stats-grid,
+  .health-cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+
+  /* Chat Widget - Slightly smaller */
+  .chat-window {
+    width: 340px;
+    height: 500px;
+  }
+
+  .chat-widget {
+    bottom: 1.5rem;
+    right: 1.5rem;
+  }
+
+  /* Headers - Smaller text */
+  .page-header h1,
+  .header-content h1 {
+    font-size: 1.75rem;
+  }
+
+  /* Cards - Reduce padding */
+  .dashboard-card,
+  .stat-card,
+  .health-card {
+    padding: 1.25rem;
+  }
+}
+
+/* --- Mobile Breakpoint (480px) --- */
+@media (max-width: 480px) {
+
+  /* Sidebar - Completely hidden, hamburger menu needed */
+  .sidebar {
+    position: fixed;
+    left: -100%;
+    width: 280px;
+    height: 100vh;
+    z-index: 1001;
+    transition: left 0.3s ease;
+    padding: 1.5rem 1rem;
+  }
+
+  .sidebar.open {
+    left: 0;
+  }
+
+  .sidebar .nav-link span,
+  .sidebar .user-profile-section span,
+  .sidebar-theme-toggle span {
+    display: inline;
+  }
+
+  .sidebar .nav-link {
+    justify-content: flex-start;
+    padding: 0.75rem 1rem;
+  }
+
+  /* Mobile Overlay */
+  .mobile-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+  }
+
+  .mobile-overlay.active {
+    display: block;
+  }
+
+  /* Main Content - Full width */
+  .main-content {
+    margin-left: 0;
+    padding: 1rem;
+    padding-top: 4rem;
+    /* Space for mobile header */
+  }
+
+  /* Mobile Header */
+  .mobile-header {
+    display: flex;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    background: var(--bg-card);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+    border-bottom: var(--glass-border);
+    padding: 0 1rem;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 999;
+  }
+
+  .hamburger-btn {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-size: 1.5rem;
+    cursor: pointer;
+    border-radius: 8px;
+  }
+
+  .hamburger-btn:hover {
+    background: var(--bg-button-secondary);
+  }
+
+  /* Dashboard Grid - Single column */
+  .dashboard-grid,
+  .stats-grid,
+  .health-cards-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  /* Chat Widget - Full width bottom sheet */
+  .chat-widget {
+    bottom: 0;
+    right: 0;
+    left: 0;
+    width: 100%;
+  }
+
+  .chat-toggle-btn {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    width: 56px;
+    height: 56px;
+  }
+
+  .chat-window {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: 80vh;
+    border-radius: 24px 24px 0 0;
+    max-height: 80vh;
+  }
+
+  .chat-widget.open .chat-toggle-btn {
+    display: none;
+  }
+
+  /* Headers - Mobile size */
+  .page-header h1,
+  .header-content h1 {
+    font-size: 1.5rem;
+  }
+
+  .page-header .subtitle,
+  .header-content .subtitle {
+    font-size: 0.875rem;
+  }
+
+  /* Cards - Compact padding */
+  .dashboard-card,
+  .stat-card,
+  .health-card {
+    padding: 1rem;
+    border-radius: 16px;
+  }
+
+  /* Buttons - Touch friendly */
+  button,
+  .btn-primary,
+  .btn-secondary {
+    min-height: 44px;
+    padding: 0.75rem 1.25rem;
+    font-size: 0.95rem;
+  }
+
+  /* Form inputs - Touch friendly */
+  input,
+  textarea,
+  select {
+    min-height: 44px;
+    padding: 0.75rem 1rem;
+    font-size: 16px;
+    /* Prevents iOS zoom */
+  }
+
+  /* Digital Twin Section */
+  .digital-twin-section {
+    height: 200px;
+    min-height: 200px;
+  }
+
+  /* Health Score Badge */
+  .health-score-badge {
+    font-size: 2.5rem;
+  }
+
+  /* Tabs - Scrollable */
+  .tabs-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .tabs-container::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Time Range Selector - Compact */
+  .time-range-selector {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .range-btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+  }
+
+  /* Scan Page */
+  .scan-container {
+    padding: 1.5rem;
+  }
+
+  .drop-zone {
+    padding: 2rem 1rem;
+  }
+
+  .drop-zone h3 {
+    font-size: 1rem;
+  }
+
+  /* Settings Page */
+  .settings-form {
+    padding: 1rem;
+  }
+
+  .form-group label {
+    font-size: 0.9rem;
+  }
+
+  /* Voice Orb - Smaller on mobile */
+  .voice-orb {
+    width: 100px;
+    height: 100px;
+  }
+}
+
+/* --- Small Mobile (360px) --- */
+@media (max-width: 360px) {
+  .main-content {
+    padding: 0.75rem;
+    padding-top: 4rem;
+  }
+
+  .dashboard-card,
+  .stat-card {
+    padding: 0.75rem;
+  }
+
+  .page-header h1 {
+    font-size: 1.25rem;
+  }
+
+  .chat-window {
+    height: 85vh;
+  }
+}
+
+/* --- Landscape Mobile --- */
+@media (max-height: 500px) and (orientation: landscape) {
+  .chat-window {
+    height: 90vh;
+  }
+
+  .digital-twin-section {
+    height: 150px;
+  }
+}
+
+/* --- Desktop: Hide mobile elements --- */
+@media (min-width: 481px) {
+  .mobile-header {
+    display: none !important;
+  }
+
+  .mobile-overlay {
+    display: none !important;
+  }
+}
