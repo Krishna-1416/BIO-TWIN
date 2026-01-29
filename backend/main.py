@@ -133,9 +133,9 @@ def google_auth(user_id: str = "guest_user"):
 
 @app.get("/auth/callback")
 def google_callback(code: str, state: str = None):
-    # Retrieve user_id from state if we implemented it, otherwise fallback
-    # For now, we assume single-user behavior for the callback flow or need frontend to handle
-    user_id = "guest_user" # Limitation: Simple callback can't infer user without state param
+    # Extract user_id from state parameter (passed during auth URL generation)
+    user_id = state if state else "guest_user"
+    print(f"[AUTH CALLBACK] Received code for user_id: {user_id}")
     
     service = google_calendar.GoogleCalendarService(user_id=user_id)
     try:
@@ -143,6 +143,7 @@ def google_callback(code: str, state: str = None):
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url=f"{os.getenv('FRONTEND_URL', 'http://localhost:5173')}/?auth=success")
     except Exception as e:
+        print(f"[AUTH CALLBACK ERROR] {e}")
         return {"error": str(e)}
 
 @app.get("/auth/status")

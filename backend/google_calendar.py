@@ -132,7 +132,8 @@ class GoogleCalendarService:
                 redirect_uri=redirect_uri
             )
             
-        auth_url, _ = flow.authorization_url(prompt='consent', access_type='offline')
+        auth_url, _ = flow.authorization_url(prompt='consent', access_type='offline', state=self.user_id)
+        print(f"[CALENDAR] Generated auth URL with state={self.user_id}")
         return auth_url
 
     def save_token_from_code(self, code):
