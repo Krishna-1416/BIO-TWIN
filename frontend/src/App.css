@@ -2648,3 +2648,67 @@ body {
     display: none !important;
   }
 }
+
+/* ============================================
+   PROFESSIONAL MOBILE APP POLISH (Overrides)
+   ============================================ */
+
+/* 1. Global Touch interactions */
+html {
+  -webkit-tap-highlight-color: transparent;
+  /* Remove gray tap box on iOS */
+  scroll-behavior: smooth;
+}
+
+body {
+  /* Prevent horizontal scroll bounce */
+  overscroll-behavior-y: none;
+}
+
+/* 2. Better Active States for Touch */
+button:active,
+.nav-item:active,
+.card-action-btn:active {
+  transform: scale(0.97);
+  transition: transform 0.1s;
+}
+
+/* 3. Safe Area Support (Notch & Home Bar) */
+@media (max-width: 480px) {
+
+  /* Fix Header for Notch */
+  .mobile-header {
+    height: calc(56px + env(safe-area-inset-top));
+    padding-top: env(safe-area-inset-top);
+  }
+
+  /* Fix Main Content for Header */
+  .main-content {
+    padding-top: calc(4rem + env(safe-area-inset-top));
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+  }
+
+  /* Fix Chat Window for Home Bar */
+  .chat-window {
+    padding-bottom: env(safe-area-inset-bottom);
+    height: calc(80vh + env(safe-area-inset-bottom));
+  }
+
+  /* Ensure inputs don't zoom on iOS (Force 16px) */
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* 4. Scrollbar Polish */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.4);
+  border-radius: 4px;
+}
