@@ -2,14 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, orderBy, limit, getDocs, where } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import {
-    AreaChart,
-    Area,
+    LineChart,
+    Line,
     XAxis,
     YAxis,
     CartesianGrid,
     Tooltip,
-    ResponsiveContainer,
-    Legend
+    ResponsiveContainer
 } from 'recharts';
 import { motion } from 'framer-motion';
 import './TrendsPage.css';
@@ -199,21 +198,10 @@ const TrendsPage = () => {
                 ) : (
                     <div className="chart-container">
                         <ResponsiveContainer width="100%" height={350}>
-                            <AreaChart data={trendsData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
-                                <defs>
-                                    <linearGradient id="healthScoreGradient" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#0A84FF" stopOpacity={0.4} />
-                                        <stop offset="95%" stopColor="#0A84FF" stopOpacity={0} />
-                                    </linearGradient>
-                                    <linearGradient id="lineGradient" x1="0" y1="0" x2="1" y2="0">
-                                        <stop offset="0%" stopColor="#5E5CE6" />
-                                        <stop offset="50%" stopColor="#0A84FF" />
-                                        <stop offset="100%" stopColor="#30D158" />
-                                    </linearGradient>
-                                </defs>
+                            <LineChart data={trendsData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
                                 <CartesianGrid
                                     strokeDasharray="3 3"
-                                    stroke="rgba(255,255,255,0.05)"
+                                    stroke="rgba(255,255,255,0.08)"
                                     vertical={false}
                                 />
                                 <XAxis
@@ -232,26 +220,25 @@ const TrendsPage = () => {
                                     tickFormatter={(value) => `${value}`}
                                 />
                                 <Tooltip content={<CustomTooltip />} />
-                                <Area
+                                <Line
                                     type="monotone"
                                     dataKey="score"
-                                    stroke="url(#lineGradient)"
-                                    strokeWidth={3}
-                                    fill="url(#healthScoreGradient)"
+                                    stroke="#0A84FF"
+                                    strokeWidth={2.5}
                                     dot={{
                                         fill: '#0A84FF',
                                         strokeWidth: 2,
                                         stroke: '#fff',
-                                        r: 5
+                                        r: 4
                                     }}
                                     activeDot={{
-                                        r: 8,
+                                        r: 7,
                                         fill: '#0A84FF',
                                         stroke: '#fff',
-                                        strokeWidth: 3
+                                        strokeWidth: 2
                                     }}
                                 />
-                            </AreaChart>
+                            </LineChart>
                         </ResponsiveContainer>
                     </div>
                 )}
