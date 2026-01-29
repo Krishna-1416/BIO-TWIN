@@ -331,11 +331,23 @@ function App() {
 
       recognition.onresult = (event) => {
         if (event.results.length > 0) {
-          const transcript = event.results[event.results.length - 1][0].transcript;
-          console.log("Voice heard:", transcript);
-          if (event.results[event.results.length - 1].isFinal) {
+          const result = event.results[event.results.length - 1];
+          const transcript = result[0].transcript.trim();
+          const confidence = result[0].confidence;
+
+          console.log("Voice heard:", transcript, "| Confidence:", confidence);
+
+          // Only process if:
+          // 1. It's a final result (not interim)
+          // 2. Confidence is above threshold (0.7 = 70%)
+          // 3. Has at least 2 words (filters out noise/single syllables)
+          const wordCount = transcript.split(/\s+/).filter(w => w.length > 0).length;
+
+          if (result.isFinal && confidence >= 0.7 && wordCount >= 2) {
             setChatInput(transcript); // Set input for visual feedback
             handleSendMessage(transcript); // Auto-send
+          } else if (result.isFinal) {
+            console.log(`Ignored: confidence=${confidence.toFixed(2)}, words=${wordCount}`);
           }
         }
       };
@@ -383,7 +395,7 @@ function App() {
                 console.error("Error restarting recognition:", e);
               }
             }
-          }, 1000); // 1 second delay before restart
+          }, 2000); // 2 second delay before restart (less sensitive)
         }
       };
 
