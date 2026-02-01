@@ -79,7 +79,12 @@ class GeminiAgent:
             return result
         else:
             # Fallback to mock for demo if not signed in
-            return {"status": "simulated", "message": "Google Calendar not connected. Simulated booking success.", "details": f"{reason} on {date}"}
+            print("[AGENT] Calendar not authorized. Returning detailed SIMULATION message.")
+            return {
+                "status": "simulated", 
+                "message": "⚠️ [DEMO MODE] Google Calendar is NOT connected. I have verified the intent but CANNOT actually book this yet. Please connect your calendar in the dashboard.", 
+                "details": f"Intended: {reason} on {date}"
+            }
 
     def block_calendar_for_nap(self, duration_mins: int):
         """Blocks the user's calendar for a nap or rest period."""

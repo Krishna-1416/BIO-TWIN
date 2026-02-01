@@ -245,6 +245,57 @@ def chat_endpoint(request: ChatRequest):
 
     return {"response": response_text}
 
+
+    
+# ==========================================
+# AUTHENTICATION ROUTES (Google Calendar)
+# ==========================================
+
+@app.get("/auth/google")
+def get_google_auth_url(user_id: str = "guest_user"):
+    """
+    Returns the URL to start the Google OAuth flow.
+    Frontend should utilize this to redirect the user.
+    """
+    try:
+        service = google_calendar.GoogleCalendarService(user_id=user_id)
+        auth_url = service.get_auth_url()
+        return {"url": auth_url}
+    except Exception as e:
+        print(f"Error generating auth URL: {e}")
+        return {"error": str(e), "message": "Calendar feature not available (check server logs)."}
+
+@app.get("/auth/callback")
+def auth_callback(code: str, state: str = "guest_user"):
+    """
+    Handle the redirect from Google. Exchange code for token.
+    """
+    try:
+        print(f"Received auth callback for user: {state}")
+        service = google_calendar.GoogleCalendarService(user_id=state)
+        service.save_token_from_code(code)
+        
+        # Determine redirect based on environment
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+        
+        # Return a script to close the popup or redirect
+        return {
+            "status": "success", 
+            "message": "Calendar connected successfully!",
+            "action": "Close this window and return to the app."
+        }
+    except Exception as e:
+        print(f"Auth callback failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/auth/status")
+def get_auth_status(user_id: str = "guest_user"):
+    """
+    Check if the user has a valid calendar token.
+    """
+    service = google_calendar.GoogleCalendarService(user_id=user_id)
+    return {"connected": service.is_authorized()}
+
 # Debug Endpoints remain same
 @app.on_event("startup")
 async def startup_event():
