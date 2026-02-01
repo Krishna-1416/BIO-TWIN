@@ -66,6 +66,11 @@ class GeminiAgent:
     def book_appointment(self, reason: str, date: str):
         """Books a medical appointment for a specific reason and date. Date should be in ISO format (YYYY-MM-DDTHH:MM:SS)"""
         print(f"\n[TOOL EXECUTION] Booking appointment for '{reason}' on {date} (timezone: {self.user_timezone})...")
+        
+        # IMPORTANT: Re-instantiate calendar service to pick up fresh tokens from Firestore
+        # This fixes the stale session bug where an old agent has an unauthorized service
+        self.calendar_service = google_calendar.GoogleCalendarService(user_id=self.user_id)
+        
         print(f"[DEBUG] Agent user_id: {self.user_id}")
         print(f"[DEBUG] Calendar service user_id: {self.calendar_service.user_id}")
         print(f"[DEBUG] Calendar has creds: {self.calendar_service.creds is not None}")
