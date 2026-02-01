@@ -66,7 +66,15 @@ class GeminiAgent:
     def book_appointment(self, reason: str, date: str):
         """Books a medical appointment for a specific reason and date. Date should be in ISO format (YYYY-MM-DDTHH:MM:SS)"""
         print(f"\n[TOOL EXECUTION] Booking appointment for '{reason}' on {date} (timezone: {self.user_timezone})...")
-        if self.calendar_service.is_authorized():
+        print(f"[DEBUG] Agent user_id: {self.user_id}")
+        print(f"[DEBUG] Calendar service user_id: {self.calendar_service.user_id}")
+        print(f"[DEBUG] Calendar has creds: {self.calendar_service.creds is not None}")
+        if self.calendar_service.creds:
+            print(f"[DEBUG] Creds valid: {self.calendar_service.creds.valid}")
+            print(f"[DEBUG] Creds expired: {self.calendar_service.creds.expired}")
+        is_auth = self.calendar_service.is_authorized()
+        print(f"[DEBUG] is_authorized result: {is_auth}")
+        if is_auth:
             result = self.calendar_service.create_event(
                 reason, 
                 "Medical appointment booked by Bio-Twin", 
