@@ -278,28 +278,7 @@
     }
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-    .settings-container {
-        padding: 1rem;
-    }
-
-    .settings-header h1 {
-        font-size: 2rem;
-    }
-
-    .form-row {
-        grid-template-columns: 1fr;
-    }
-
-    .settings-section {
-        padding: 1.5rem;
-    }
-
-    .save-btn {
-        width: 100%;
-    }
-}
+/* Mobile responsive styles removed */
 
 /* Custom Glass Dropdown */
 .custom-select-container {

@@ -107,43 +107,7 @@
     /* Vertically center all columns */
 }
 
-/* Mobile Responsive */
-@media (max-width: 768px) {
-    .auth-content-grid {
-        grid-template-columns: 1fr;
-        gap: 2rem;
-    }
-
-    .divider-col {
-        display: flex;
-        flex-direction: row;
-        align-items: center;
-        width: 100%;
-        margin: 1rem 0;
-    }
-
-    .vertical-line {
-        height: 1px !important;
-        width: 100% !important;
-    }
-
-    .divider-text {
-        margin: 0 1rem !important;
-    }
-
-    .desktop-submit-btn {
-        display: none !important;
-    }
-
-    .mobile-submit-btn {
-        display: block !important;
-    }
-
-    .auth-theme-toggle {
-        top: 1rem;
-        right: 1rem;
-    }
-}
+/* Mobile responsive styles removed */
 
 /* Left Column */
 .left-col {

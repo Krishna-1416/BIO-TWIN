@@ -296,40 +296,7 @@
     margin: 0.25rem 0 0;
 }
 
-/* --- Responsive Design --- */
-@media (max-width: 900px) {
-    .stats-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .trends-header {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-
-    .header-content h1 {
-        font-size: 2rem;
-    }
-}
-
-@media (max-width: 600px) {
-    .trends-chart-card {
-        padding: 1rem;
-    }
-
-    .chart-container {
-        height: 280px;
-    }
-
-    .stat-card {
-        padding: 1rem;
-    }
-
-    .time-range-selector {
-        width: 100%;
-        justify-content: center;
-    }
-}
+/* Mobile responsive styles removed */
 
 /* --- Light Mode Adjustments --- */
 [data-theme="light"] .trends-tooltip {
