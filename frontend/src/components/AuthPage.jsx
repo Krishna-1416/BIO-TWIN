@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { auth } from '../firebase';
+import { auth, db } from '../firebase';
 import {
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
     GoogleAuthProvider,
     signInWithPopup,
-    updateProfile
+    updateProfile,
+    signInAnonymously
 } from 'firebase/auth';
+import { doc, setDoc, collection, addDoc } from 'firebase/firestore';
 import './AuthPage.css';
 
 const AuthPage = ({ onAuthSuccess, theme, toggleTheme }) => {
@@ -17,6 +19,149 @@ const AuthPage = ({ onAuthSuccess, theme, toggleTheme }) => {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [demoLoading, setDemoLoading] = useState(false);
+
+    // Demo mode login with anonymous auth
+    const handleDemoLogin = async () => {
+        setDemoLoading(true);
+        setError('');
+        try {
+            // Sign in anonymously
+            const userCredential = await signInAnonymously(auth);
+            const user = userCredential.user;
+
+            // Set display name for demo user
+            await updateProfile(user, {
+                displayName: 'Demo User'
+            });
+
+            // Pre-populate multiple demo health scans to showcase history & trends
+            const now = new Date();
+
+            // Demo Scan 1 - Most Recent (Current)
+            const demoScan1 = {
+                status: 'Healthy',
+                hydration: 'High',
+                lastScan: 'Just Now',
+                details: 'Recent comprehensive health panel shows good overall markers. Vitamin D slightly low but improving. Continue current lifestyle habits.',
+                score: 82,
+                velocity: 'Improving',
+                riskFactor: 'Low Vitamin D',
+                correlations: [
+                    {
+                        title: 'Vitamin D Improvement',
+                        description: 'Vitamin D levels increased from 18 to 24 ng/mL. Keep up the sunlight exposure and supplementation.',
+                        type: 'positive'
+                    },
+                    {
+                        title: 'Excellent Hydration',
+                        description: 'Hydration markers are optimal. Your water intake is supporting kidney function and cellular health.',
+                        type: 'positive'
+                    },
+                    {
+                        title: 'Cholesterol Balance',
+                        description: 'HDL/LDL ratio improved to 1:2.8. Cardiovascular health trending positively.',
+                        type: 'positive'
+                    },
+                    {
+                        title: 'Blood Sugar Stability',
+                        description: 'HbA1c at 5.2% - excellent glucose control. No diabetes risk detected.',
+                        type: 'positive'
+                    }
+                ],
+                timestamp: new Date(now.getTime() - 1000 * 60 * 5), // 5 minutes ago
+                fileUrl: null,
+                fileName: 'health_panel_jan_2026.pdf',
+                fileType: 'application/pdf',
+                userId: user.uid
+            };
+
+            // Demo Scan 2 - One Month Ago
+            const demoScan2 = {
+                status: 'Healthy',
+                hydration: 'Medium',
+                lastScan: '1 month ago',
+                details: 'December health check shows stable markers. Vitamin D needs attention. Consider supplementation.',
+                score: 75,
+                velocity: 'Stable',
+                riskFactor: 'Low Vitamin D',
+                correlations: [
+                    {
+                        title: 'Vitamin D Deficiency',
+                        description: 'Vitamin D at 18 ng/mL (low). Recommend 2000 IU daily supplement and 15 min morning sun.',
+                        type: 'negative'
+                    },
+                    {
+                        title: 'Moderate Hydration',
+                        description: 'Hydration adequate but could be improved. Aim for 8 glasses of water daily.',
+                        type: 'neutral'
+                    },
+                    {
+                        title: 'Cholesterol Watch',
+                        description: 'LDL slightly elevated at 125 mg/dL. Monitor diet and consider omega-3 supplementation.',
+                        type: 'negative'
+                    }
+                ],
+                timestamp: new Date(now.getTime() - 1000 * 60 * 60 * 24 * 30), // 30 days ago
+                fileUrl: null,
+                fileName: 'health_panel_dec_2025.pdf',
+                fileType: 'application/pdf',
+                userId: user.uid
+            };
+
+            // Demo Scan 3 - Three Months Ago
+            const demoScan3 = {
+                status: 'Critical',
+                hydration: 'Low',
+                lastScan: '3 months ago',
+                details: 'October baseline screening. Multiple markers need attention. Follow-up recommended.',
+                score: 68,
+                velocity: 'Declining',
+                riskFactor: 'High Cortisol & Low Vitamin D',
+                correlations: [
+                    {
+                        title: 'Stress Markers Elevated',
+                        description: 'Cortisol at 28 µg/dL (high). Indicates chronic stress. Recommend stress management techniques.',
+                        type: 'negative'
+                    },
+                    {
+                        title: 'Vitamin D Critical',
+                        description: 'Vitamin D at 12 ng/mL (deficient). Immediate supplementation required.',
+                        type: 'negative'
+                    },
+                    {
+                        title: 'Dehydration Signs',
+                        description: 'Electrolyte imbalance suggests chronic dehydration. Increase water intake significantly.',
+                        type: 'negative'
+                    },
+                    {
+                        title: 'Thyroid Function',
+                        description: 'TSH slightly elevated at 4.2 mIU/L. Monitor for hypothyroidism symptoms.',
+                        type: 'negative'
+                    }
+                ],
+                timestamp: new Date(now.getTime() - 1000 * 60 * 60 * 24 * 90), // 90 days ago
+                fileUrl: null,
+                fileName: 'baseline_health_oct_2025.pdf',
+                fileType: 'application/pdf',
+                userId: user.uid
+            };
+
+            // Save all demo scans to Firestore
+            await addDoc(collection(db, 'healthScans'), demoScan1);
+            await addDoc(collection(db, 'healthScans'), demoScan2);
+            await addDoc(collection(db, 'healthScans'), demoScan3);
+
+
+            console.log('Demo user created with pre-populated data');
+            onAuthSuccess();
+        } catch (err) {
+            console.error('Demo login error:', err);
+            setError('Failed to start demo mode. Please try again.');
+        } finally {
+            setDemoLoading(false);
+        }
+    };
 
     const handleGoogleSignIn = async () => {
         setLoading(true);
@@ -186,9 +331,24 @@ const AuthPage = ({ onAuthSuccess, theme, toggleTheme }) => {
                     {/* Right Column: Actions */}
                     <div className="auth-column right-col">
                         <div className="social-login">
-                            <button className="social-btn google" onClick={handleGoogleSignIn} disabled={loading}>
+                            <button className="social-btn google" onClick={handleGoogleSignIn} disabled={loading || demoLoading}>
                                 <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" />
                                 <span>Sign up with Google</span>
+                            </button>
+
+                            {/* OR Separator */}
+                            <div className="demo-or-divider">
+                                <span>OR</span>
+                            </div>
+
+                            {/* Try Demo Button - Matches theme */}
+                            <button
+                                className="social-btn demo"
+                                onClick={handleDemoLogin}
+                                disabled={loading || demoLoading}
+                            >
+                                <span className="material-icons">science</span>
+                                <span>{demoLoading ? 'Loading...' : 'Try Demo'}</span>
                             </button>
                         </div>
                     </div>

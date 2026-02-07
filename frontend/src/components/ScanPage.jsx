@@ -55,6 +55,17 @@ const ScanPage = ({ onScanComplete, onSkip, embedded }) => {
 
     return (
         <div className={`scan-page ${isDragging ? 'dragging' : ''} ${embedded ? 'embedded' : ''}`}>
+            {/* Hamburger menu for standalone mode on mobile */}
+            {!embedded && (
+                <button
+                    className="mobile-menu-btn"
+                    onClick={onSkip}
+                    aria-label="Menu"
+                >
+                    <span className="material-icons">menu</span>
+                </button>
+            )}
+
             <div className="scan-container">
                 <h1>Upload Medical Report</h1>
                 <p className="subtitle">Upload your blood test, lab report, or checkup summary to generate your Bio-Twin.</p>

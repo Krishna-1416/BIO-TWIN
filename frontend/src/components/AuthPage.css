@@ -107,7 +107,148 @@
     /* Vertically center all columns */
 }
 
-/* Mobile responsive styles removed */
+/* ============================================
+   MOBILE RESPONSIVE DESIGN (Modern & Professional)
+   ============================================ */
+
+@media (max-width: 768px) {
+    .auth-container {
+        padding: calc(1rem + var(--safe-area-top)) var(--safe-area-right) calc(1rem + var(--safe-area-bottom)) var(--safe-area-left);
+        align-items: flex-start;
+        /* Raise card slightly */
+        overflow-y: auto;
+        /* Ensure scrolling */
+        min-height: 100vh;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .auth-glass-card {
+        padding: 2rem 1.5rem;
+        /* Compact padding */
+        margin-top: 1rem;
+        background: rgba(255, 255, 255, 0.05);
+        /* slightly more visible on mobile */
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(25px);
+        -webkit-backdrop-filter: blur(25px);
+    }
+
+    .auth-theme-toggle {
+        top: 1rem;
+        right: 1rem;
+        width: 36px;
+        height: 36px;
+    }
+
+    /* Stack the grid */
+    .auth-content-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    /* Left Column (Main Form) */
+    .left-col {
+        order: 1;
+        /* Form first */
+        width: 100%;
+    }
+
+    .auth-title {
+        font-size: 2rem;
+        /* Smaller title */
+        margin-bottom: 1.5rem;
+        text-align: center;
+    }
+
+    .capsule-toggle-container {
+        margin-bottom: 1.5rem;
+        /* Tighter spacing */
+    }
+
+    /* Hide Desktop Vertical Line */
+    .divider-col {
+        display: none;
+    }
+
+    /* Form Inputs with Native Feel */
+    .input-group input {
+        padding: 0.9rem 1.2rem;
+        /* Comfortable touch target */
+        font-size: 1rem;
+        /* Readable font size (16px avoids iOS zoom) */
+        transition: all 0.2s var(--smooth-easing, ease);
+    }
+
+    .input-group input:focus {
+        transform: scale(1.01);
+    }
+
+    .auth-submit-btn {
+        padding: 0.9rem;
+        font-size: 1.1rem;
+        /* Larger text for button */
+        margin-top: 0.5rem;
+        transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+
+    .auth-submit-btn:active:not(:disabled) {
+        transform: scale(0.98);
+    }
+
+    /* Mobile Divider */
+    .divider {
+        display: flex;
+        /* Show horizontal divider */
+        margin: 1.5rem 0;
+    }
+
+    .divider::before,
+    .divider::after {
+        content: '';
+        flex: 1;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        margin: 0 1rem;
+    }
+
+    [data-theme='light'] .divider::before,
+    [data-theme='light'] .divider::after {
+        border-color: rgba(0, 0, 0, 0.1);
+    }
+
+    /* Right Column (Social) */
+    .right-col {
+        order: 2;
+        /* Social below */
+        padding-left: 0;
+        /* Reset desktop padding */
+        width: 100%;
+        align-items: center;
+    }
+
+    .social-login {
+        max-width: 100%;
+        width: 100%;
+    }
+
+    .social-btn {
+        max-width: 100%;
+        /* Full width social buttons */
+        justify-content: center;
+        transition: transform 0.15s ease, background 0.15s ease;
+    }
+
+    .social-btn:active:not(:disabled) {
+        transform: scale(0.98);
+    }
+
+    /* Animation Optimization */
+    .auth-container::before,
+    .auth-container::after {
+        filter: blur(80px);
+        /* Reduce blur cost slightly */
+    }
+}
 
 /* Left Column */
 .left-col {
@@ -381,4 +522,40 @@
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+/* ============================================
+   DEMO MODE BUTTON STYLES
+   ============================================ */
+
+/* Simple OR Divider matching page theme */
+.demo-or-divider {
+    width: 100%;
+    text-align: center;
+    margin: 0.8rem 0;
+    position: relative;
+}
+
+.demo-or-divider span {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 500;
+}
+
+/* Demo Button - Matches social-btn style with subtle accent */
+.social-btn.demo {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
+    border: 1px solid rgba(102, 126, 234, 0.3);
+}
+
+.social-btn.demo:hover:not(:disabled) {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%);
+    border-color: rgba(102, 126, 234, 0.5);
+}
+
+.social-btn.demo .material-icons {
+    font-size: 1.1rem;
+    color: var(--accent-blue, #667eea);
 }
