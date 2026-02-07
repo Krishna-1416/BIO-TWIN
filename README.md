@@ -96,10 +96,42 @@ npm run dev
 
 ### 4. Usage
 1.  Open `http://localhost:5173` in your browser.
-2.  **Login/Signup** to create your secure account.
+2.  **Login/Signup** to create your secure account **OR** click **"Try Demo"** for instant access.
 3.  Go to **Upload Report** and drag-and-drop a blood test or medical scan.
 4.  Watch your **Digital Twin** update in real-time.
 5.  Check the **History** tab for past trends and health insights.
+
+---
+
+## 🎯 Guest Demo Mode (For Hackathon Judges)
+
+Bio-Twin includes a **frictionless demo mode** that allows judges to experience the full application **without creating an account**.
+
+### How to Use Demo Mode:
+1. Click **"Get Started"** on the landing page
+2. Click the **"Try Demo"** button (purple gradient button with flask icon)
+3. Instantly access the dashboard with **3 pre-loaded health scans** showing:
+   - Health score progression: 68 → 75 → 82
+   - Multiple biomarker correlations
+   - Realistic health journey over 3 months
+
+### What Demo Mode Showcases:
+✅ **Gemini AI Analysis** - Pre-populated with realistic health insights  
+✅ **Health History** - 3 scans spanning 90 days  
+✅ **Trends Visualization** - Score improvement over time  
+✅ **Correlations** - Vitamin D, hydration, cholesterol, stress markers  
+✅ **3D Digital Twin** - Visual health status representation  
+✅ **Chat Agent** - Ask health questions with pre-loaded context
+
+### Firebase Setup for Demo Mode:
+To enable Guest Demo Mode, you must enable **Anonymous Authentication** in Firebase:
+1. Go to [Firebase Console](https://console.firebase.google.com/)
+2. Select your project
+3. Navigate to **Authentication** → **Sign-in method**
+4. Enable **Anonymous** provider
+5. Save changes
+
+**Note:** Demo users are created with Firebase Anonymous Auth and pre-populated with sample health data. No personal information is collected.
 
 ---
 
@@ -108,10 +140,12 @@ npm run dev
 Bio-Twin demonstrates the following core functionalities:
 
 ✅ **User Authentication** - Secure login/signup via Firebase  
+✅ **Guest Demo Mode** - Instant access with pre-loaded health data (no signup required)  
 ✅ **Medical Document Processing** - Upload PDF/images of health reports  
 ✅ **AI Analysis** - Gemini extracts health insights from documents  
 ✅ **Real-time Visualization** - 3D Digital Twin reflects health status  
 ✅ **Health History** - Persistent storage of all past scans and insights  
+✅ **Trends Analysis** - Track health score progression over time  
 ✅ **Calendar Integration** - Google Calendar appointment booking  
 ✅ **Voice Agent** - Hands-free health queries with speech recognition  
 ✅ **Responsive UI** - Works on desktop and tablets
