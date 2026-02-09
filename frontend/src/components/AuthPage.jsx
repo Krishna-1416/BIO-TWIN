@@ -32,7 +32,7 @@ const AuthPage = ({ onAuthSuccess, theme, toggleTheme }) => {
 
             // Set display name for demo user
             await updateProfile(user, {
-                displayName: 'Demo User'
+                displayName: 'Guest'
             });
 
             // Pre-populate multiple demo health scans to showcase history & trends

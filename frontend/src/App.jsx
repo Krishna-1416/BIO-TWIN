@@ -60,7 +60,9 @@ function App() {
         // Try to get first name from displayName, otherwise use email username
         if (currentUser.displayName) {
           // Extract first name from full name (e.g., "John Doe" -> "John")
-          const firstName = currentUser.displayName.split(' ')[0];
+          // If name is "Demo User", show "Guest" instead
+          const rawName = currentUser.displayName;
+          const firstName = (rawName === 'Demo User' || rawName === 'Guest') ? 'Guest' : rawName.split(' ')[0];
           setUserName(firstName);
           setShowNameModal(false); // Has name, don't show modal
         } else {
