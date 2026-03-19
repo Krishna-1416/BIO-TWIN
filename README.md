@@ -28,7 +28,7 @@ We use a "Best of Breed" approach to ensure security, speed, and reliability.
 
 ### **Backend (The Brain)**
 *   **Python (FastAPI):** Orchestrates the AI analysis and data flow.
-*   **Google Gemini 1.5 Flash:** The multimodal AI prowess that "reads" your medical reports and understands complex health data.
+*   **Google Gemini 3 Flash:** The multimodal AI prowess that "reads" your medical reports and understands complex health data.
 
 ### **Core Infrastructure (The Data)**
 *   **Firebase Authentication:** Secure login and user identity management.
@@ -142,4 +142,4 @@ Bio-Twin demonstrates the following core functionalities:
 ✅ **Trends Analysis** - Track health score progression over time  
 ✅ **Calendar Integration** - Google Calendar appointment booking  
 ✅ **Voice Agent** - Hands-free health queries with speech recognition  
-✅ **Responsive UI** - Works on desktop and tablets
+✅ **Responsive UI** - Works on desktop and tablets
