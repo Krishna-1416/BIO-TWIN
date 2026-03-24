@@ -1,0 +1,4 @@
+## 2024-03-24 - File Upload Path Traversal
+**Vulnerability:** The `/scan` endpoint in `backend/main.py` directly used the user-provided `file.filename` to construct the file save path (`f"uploads/{file.filename}"`). This allowed an attacker to upload files with names like `../../../etc/passwd` to overwrite arbitrary files on the server (Path Traversal).
+**Learning:** File uploads are inherently dangerous if the filename is not sanitized. Relying on the client-provided filename directly is a common and critical security oversight.
+**Prevention:** Always use `os.path.basename(file.filename)` to extract only the filename component, and prepend a unique identifier (like `uuid.uuid4().hex`) to prevent file collisions and overwrite attacks. Ensure the final path is safely constructed using `os.path.join()`.
