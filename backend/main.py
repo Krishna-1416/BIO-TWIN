@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import shutil
 import os
+import uuid
 import warnings
 from firebase_admin import firestore
 
@@ -81,7 +82,10 @@ def get_health_data(user_id: str = "guest_user"):
 
 @app.post("/scan")
 def scan_endpoint(file: UploadFile = File(...), user_id: str = "guest_user"):
-    file_location = f"uploads/{file.filename}"
+    # 🛡️ Sentinel: Prevent Path Traversal by sanitizing the filename and using a UUID
+    secure_filename = f"{uuid.uuid4().hex}_{os.path.basename(file.filename)}"
+    file_location = os.path.join("uploads", secure_filename)
+
     with open(file_location, "wb+") as file_object:
         shutil.copyfileobj(file.file, file_object)
     
